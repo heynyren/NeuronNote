@@ -1,4 +1,4 @@
-/* Neuron Note — app Android (Capacitor). Dùng chung NN.* trong shared.js. */
+/* Neuron Note — Android app (Capacitor). Shares NN.* from shared.js. */
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -13,32 +13,32 @@
     study: { queue: [], i: 0, revealed: false, done: 0 }
   };
 
-  /* ---------------- tiện ích ---------------- */
+  /* ---------------- utilities ---------------- */
   function when(ts) {
     if (!ts) return '';
     const d = Date.now() - ts, m = Math.floor(d / 60000);
-    if (m < 1) return 'vừa xong';
-    if (m < 60) return m + ' phút';
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm';
     const h = Math.floor(m / 60);
-    if (h < 24) return h + ' giờ';
+    if (h < 24) return h + 'h';
     const day = Math.floor(h / 24);
-    if (day < 7) return day + ' ngày';
-    return new Date(ts).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    if (day < 7) return day + 'd';
+    return new Date(ts).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: '2-digit' });
   }
   function dueLabel(ts) {
     const now = Date.now();
-    if (ts <= now) return 'đến hạn';
+    if (ts <= now) return 'due';
     const days = Math.ceil((ts - now) / NN.DAY);
-    if (days <= 1) return 'mai';
-    if (days < 30) return 'còn ' + days + ' ngày';
-    return 'còn ~' + Math.round(days / 30) + ' tháng';
+    if (days <= 1) return 'tomorrow';
+    if (days < 30) return 'in ' + days + ' days';
+    return 'in ~' + Math.round(days / 30) + ' months';
   }
   function srsBadge(n) {
     const s = n.srs || {};
-    if (s.known) return '<span class="srs known">✓ đã thuộc</span>';
-    if (s.learn === false) return '<span class="srs off">ẩn học</span>';
+    if (s.known) return '<span class="srs known">✓ mastered</span>';
+    if (s.learn === false) return '<span class="srs off">snoozed</span>';
     const due = (s.due || 0) <= Date.now();
-    return `<span class="srs ${due ? 'due' : ''}">bậc ${s.box || 0} · ${dueLabel(s.due || Date.now())}</span>`;
+    return `<span class="srs ${due ? 'due' : ''}">level ${s.box || 0} · ${dueLabel(s.due || Date.now())}</span>`;
   }
   function isHttp(u) { return /^https?:\/\//i.test(u || ''); }
   function toast(t) {
@@ -46,13 +46,13 @@
     clearTimeout(toast._t); toast._t = setTimeout(() => { el.hidden = true; }, 2400);
   }
 
-  /* ---------------- nạp & lưu ---------------- */
+  /* ---------------- load & save ---------------- */
   function load() {
     return NN.getAll().then(r => { state.notes = r.notes; state.settings = r.settings; renderAll(); });
   }
   function renderAll() { renderLib(); renderDue(); }
 
-  /* ---------------- SỔ TAY ---------------- */
+  /* ---------------- NOTEBOOK ---------------- */
   function visible() {
     let list = NN.live(state.notes);
     if (state.tags.length) {
@@ -76,7 +76,7 @@
     const all = NN.live(state.notes);
     const list = visible();
 
-    // chips lọc: nhãn định sẵn + nhãn lẻ đã dùng
+    // filter chips: predefined labels + ad-hoc labels in use
     const used = {};
     all.forEach(n => (n.tags || []).forEach(t => { used[t] = (used[t] || 0) + 1; }));
     const defined = (state.settings.labels || []).map(l => l.name);
@@ -86,17 +86,17 @@
         <span class="d ${esc(l.color || 'amber')}"></span>${esc(l.name)}<span class="n">${used[l.name] || 0}</span></button>`).join('');
     chips += extras.map(t =>
       `<button class="fchip" data-tag="${esc(t)}" aria-pressed="${state.tags.includes(t)}">${esc(t)}<span class="n">${used[t]}</span></button>`).join('');
-    $('#labelFilter').innerHTML = chips || '<span class="hint" style="padding:4px 0">Chưa có nhãn</span>';
+    $('#labelFilter').innerHTML = chips || '<span class="hint" style="padding:4px 0">No labels yet</span>';
 
     const bar = $('#tagFilterBar');
     if (state.tags.length) {
       bar.hidden = false;
       bar.querySelector('[data-mode="any"]').setAttribute('aria-pressed', String(state.tagMode === 'any'));
       bar.querySelector('[data-mode="all"]').setAttribute('aria-pressed', String(state.tagMode === 'all'));
-      $('#tagFilterCount').textContent = state.tags.length + ' nhãn';
+      $('#tagFilterCount').textContent = state.tags.length + ' labels';
     } else bar.hidden = true;
 
-    $('#libCount').textContent = list.length + ' đoạn' + (state.tags.length ? ' (đã lọc)' : '');
+    $('#libCount').textContent = list.length + ' passages' + (state.tags.length ? ' (filtered)' : '');
     $('#empty').hidden = list.length > 0;
     $('#list').innerHTML = list.map(cardHtml).join('');
   }
@@ -107,18 +107,18 @@
       return `<span class="t"${c ? ` style="background:var(--${esc(c)});color:#2A2E35"` : ''}>${esc(t)}</span>`;
     }).join('');
     const s = n.srs || {};
-    const toggleTxt = s.known ? 'Học lại' : (s.learn === false ? 'Vào học' : 'Ẩn học');
+    const toggleTxt = s.known ? 'Study again' : (s.learn === false ? 'To study' : 'Snooze');
     return `<div class="note" data-id="${esc(n.id)}" data-color="${esc(n.color || 'amber')}">
       <p class="q">${esc(n.text)}</p>
       ${NN.squash(n.note) ? `<p class="mynote">${esc(n.note)}</p>` : ''}
       ${tags ? `<div class="tagrow">${tags}</div>` : ''}
       <div class="meta">
-        <span>${esc(NN.hostOf(n.url) || 'ghi chú')}</span><span>·</span><span>${when(n.createdAt)}</span>
+        <span>${esc(NN.hostOf(n.url) || 'note')}</span><span>·</span><span>${when(n.createdAt)}</span>
         ${srsBadge(n)}
         <span class="meta-acts">
-          ${isHttp(n.url) ? '<button class="mact" data-act="open">Mở</button>' : ''}
+          ${isHttp(n.url) ? '<button class="mact" data-act="open">Open</button>' : ''}
           <button class="mact" data-act="toggle">${toggleTxt}</button>
-          <button class="mact edit" data-act="edit">Sửa</button>
+          <button class="mact edit" data-act="edit">Edit</button>
         </span>
       </div>
     </div>`;
@@ -153,15 +153,15 @@
     if (act === 'toggle') {
       const next = Object.assign({}, note); NN.ensureSrs(next); next.srs = Object.assign({}, next.srs);
       const s = next.srs; let msg;
-      if (s.known) { s.known = false; s.learn = true; msg = 'Đưa lại vào học'; }
-      else if (s.learn === false) { s.learn = true; msg = 'Đưa lại vào học'; }
-      else { s.learn = false; msg = 'Đã ẩn khỏi học'; }
+      if (s.known) { s.known = false; s.learn = true; msg = 'Back to study'; }
+      else if (s.learn === false) { s.learn = true; msg = 'Back to study'; }
+      else { s.learn = false; msg = 'Snoozed from study'; }
       NN.putNote(next).then(() => { state.notes[id] = next; renderAll(); toast(msg); autoSync(); });
     }
   });
 
-  // Trình duyệt điện thoại không có extension nên bỏ phần #nn=id, chỉ giữ text-fragment
-  // thuần (#:~:text=…) để trình duyệt tự cuộn tới và tô vàng đúng đoạn.
+  // The phone browser has no extension, so drop the #nn=id part and keep only the
+  // plain text-fragment (#:~:text=…) so the browser scrolls to and highlights the passage.
   function mobileFragUrl(u) {
     if (!u) return u;
     const idx = u.indexOf(':~:');
@@ -177,7 +177,7 @@
     if (B) B.open({ url: u }); else window.open(u, '_blank');
   }
 
-  /* ---------------- bộ chọn nhãn (dùng chung) ---------------- */
+  /* ---------------- label picker (shared) ---------------- */
   function labelDot(color) {
     return color ? `<span class="ldot" style="background:var(--${esc(color)})"></span>` : '<span class="ldot muted"></span>';
   }
@@ -189,8 +189,8 @@
     (selected || []).filter(t => !defined.some(l => l.name === t)).forEach(t => {
       html += `<button type="button" class="lchip" data-name="${esc(t)}" aria-pressed="true">${labelDot('')}${esc(t)}</button>`;
     });
-    html += `<span class="lchip-add"><button type="button" class="lchip add" data-add>＋ nhãn</button>
-      <input type="text" class="lchip-input" placeholder="Tên nhãn mới" maxlength="40" hidden></span>`;
+    html += `<span class="lchip-add"><button type="button" class="lchip add" data-add>＋ label</button>
+      <input type="text" class="lchip-input" placeholder="New label name" maxlength="40" hidden></span>`;
     return html;
   }
   function bindPicker(root) {
@@ -224,7 +224,7 @@
   }
   function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
-  /* ---------------- THÊM (dán & lưu) ---------------- */
+  /* ---------------- ADD (paste & save) ---------------- */
   function renderAddPicker() {
     const sel = state.settings.activeLabel ? [state.settings.activeLabel] : [];
     $('#addPicker').innerHTML = pickerHtml(sel);
@@ -235,17 +235,17 @@
     const C = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.Clipboard;
     if (C) C.read().then(r => { $('#addText').value = (r && r.value) || ''; }).catch(() => {});
     else if (navigator.clipboard && navigator.clipboard.readText)
-      navigator.clipboard.readText().then(v => { $('#addText').value = v || ''; }).catch(() => toast('Không đọc được clipboard'));
+      navigator.clipboard.readText().then(v => { $('#addText').value = v || ''; }).catch(() => toast('Could not read clipboard'));
   });
 
   $('#addSave').addEventListener('click', () => {
     const text = NN.squash($('#addText').value);
-    if (!text) { toast('Chưa có nội dung'); return; }
+    if (!text) { toast('Nothing to save'); return; }
     const { tags, newLabels } = readPicker($('#addPicker'));
     saveNewNote({ text, note: $('#addNote').value.trim(), tags, newLabels }).then(() => {
       $('#addText').value = ''; $('#addNote').value = '';
       renderAddPicker();
-      toast('Đã lưu');
+      toast('Saved');
       switchTab('lib');
     });
   });
@@ -294,19 +294,19 @@
       ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, newLabels) }).then(s => { state.settings = s; })
       : Promise.resolve();
     after.then(() => NN.putNote(next)).then(() => {
-      state.notes[next.id] = next; $('#editSheet').hidden = true; renderAll(); toast('Đã lưu'); autoSync();
+      state.notes[next.id] = next; $('#editSheet').hidden = true; renderAll(); toast('Saved'); autoSync();
     });
   });
   $('#editDelete').addEventListener('click', () => {
     const id = state.editingId; if (!id) return;
-    if (!confirm('Xoá đoạn này?')) return;
+    if (!confirm('Delete this passage?')) return;
     NN.removeNote(id).then(() => {
       state.notes[id] = { id, deleted: true, updatedAt: Date.now(), url: (state.notes[id] || {}).url || '', createdAt: (state.notes[id] || {}).createdAt || Date.now() };
-      $('#editSheet').hidden = true; renderAll(); toast('Đã xoá'); autoSync();
+      $('#editSheet').hidden = true; renderAll(); toast('Deleted'); autoSync();
     });
   });
 
-  /* ---------------- HỌC (SRS) ---------------- */
+  /* ---------------- STUDY (SRS) ---------------- */
   function renderDue() {
     const st = NN.studyStats(state.notes);
     const b = $('#tabDue');
@@ -325,8 +325,8 @@
   function showDone(nothing) {
     $('#studyStage').innerHTML = ''; $('#studyDone').hidden = false; $('#studyProgress').textContent = '';
     const st = NN.studyStats(state.notes);
-    $('#doneTitle').textContent = nothing && !state.study.done ? 'Không có đoạn đến hạn' : 'Xong phần đến hạn!';
-    $('#doneBody').textContent = (state.study.done ? 'Đã ôn ' + state.study.done + ' đoạn. ' : '') + 'Còn ' + st.studying + ' trong lịch, ' + st.due + ' đến hạn.';
+    $('#doneTitle').textContent = nothing && !state.study.done ? 'Nothing due right now' : 'All caught up!';
+    $('#doneBody').textContent = (state.study.done ? 'Reviewed ' + state.study.done + ' passages. ' : '') + st.studying + ' in the schedule, ' + st.due + ' due.';
   }
   function renderStudyCard() {
     const n = state.study.queue[state.study.i];
@@ -340,21 +340,21 @@
     }).join('');
     $('#studyStage').innerHTML = `
       <div class="study-card" data-color="${esc(n.color || 'amber')}">
-        <div class="st-meta">${esc(NN.hostOf(n.url) || 'ghi chú')} · bậc ${s.box || 0} · đã ôn ${s.reps || 0} lần</div>
+        <div class="st-meta">${esc(NN.hostOf(n.url) || 'note')} · level ${s.box || 0} · reviewed ${s.reps || 0} times</div>
         <blockquote class="st-quote">${esc(n.text)}</blockquote>
         ${tags ? `<div class="st-tags">${tags}</div>` : ''}
         <div class="st-reveal" hidden>
-          ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— chưa có ghi chú —</p>'}
-          ${isHttp(n.url) ? `<a class="st-open" data-open>Mở đoạn gốc ↗</a>` : ''}
+          ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
+          ${isHttp(n.url) ? `<a class="st-open" data-open>Open source passage ↗</a>` : ''}
         </div>
-        <button class="btn ghost st-reveal-btn" data-st="reveal">Xem ghi chú</button>
+        <button class="btn ghost st-reveal-btn" data-st="reveal">Show note</button>
         <div class="st-actions" hidden>
-          <button class="btn grade-no" data-st="no">Chưa nhớ</button>
-          <button class="btn grade-yes" data-st="yes">Nhớ</button>
+          <button class="btn grade-no" data-st="no">Not yet</button>
+          <button class="btn grade-yes" data-st="yes">Got it</button>
         </div>
         <div class="st-side">
-          <button class="mact" data-st="hide">Ẩn khỏi học</button>
-          <button class="mact" data-st="known">Đã thuộc</button>
+          <button class="mact" data-st="hide">Snooze</button>
+          <button class="mact" data-st="known">Mastered</button>
         </div>
       </div>`;
   }
@@ -388,12 +388,12 @@
       if (act === 'hide') next.srs.learn = false; else next.srs.known = true;
       next.updatedAt = Date.now();
       NN.putNote(next).then(() => { state.notes[next.id] = next; autoSync(); });
-      toast(act === 'hide' ? 'Đã ẩn khỏi học' : 'Đã đánh dấu đã thuộc');
+      toast(act === 'hide' ? 'Snoozed from study' : 'Marked as mastered');
       advance();
     }
   });
 
-  /* ---------------- CÀI ĐẶT ---------------- */
+  /* ---------------- SETTINGS ---------------- */
   function swatchRow(sel, id) {
     return `<div class="swatches"${id ? ` id="${id}"` : ''}>` + PALETTE.map(c =>
       `<button type="button" class="sw" data-color="${c}" style="background:var(--${c})" aria-pressed="${sel === c}"></button>`).join('') + '</div>';
@@ -407,12 +407,12 @@
         ${swatchRow(l.color)}
         <button class="set-active ${active === l.name ? 'on' : ''}">${active === l.name ? '★' : '☆'}</button>
         <button class="del">🗑</button>
-      </div>`).join('') : '<p class="hint">Chưa có nhãn nào.</p>';
+      </div>`).join('') : '<p class="hint">No labels yet.</p>';
     $('#newLabelColors').innerHTML = PALETTE.map((c, i) =>
       `<button type="button" class="sw" data-color="${c}" style="background:var(--${c})" aria-pressed="${i === 0}"></button>`).join('');
-    // nhãn mặc định
+    // default label
     $('#activePicker').innerHTML =
-      `<button type="button" class="lchip" data-active="" aria-pressed="${!active}">Không</button>` +
+      `<button type="button" class="lchip" data-active="" aria-pressed="${!active}">None</button>` +
       labels.map(l => `<button type="button" class="lchip" data-active="${esc(l.name)}" aria-pressed="${active === l.name}">${labelDot(l.color)}${esc(l.name)}</button>`).join('');
   }
   function persistLabels(labels, activeLabel) {
@@ -428,7 +428,7 @@
     const row = e.target.closest('.label-row'); if (!row) return;
     const i = +row.dataset.i, labels = (state.settings.labels || []).slice(), l = labels[i]; if (!l) return;
     if (e.target.closest('.del')) {
-      if (!confirm('Xoá nhãn "' + l.name + '"? Các đoạn vẫn giữ nhãn này.')) return;
+      if (!confirm('Delete the label "' + l.name + '"? Passages carrying it are kept.')) return;
       const removed = l.name; labels.splice(i, 1);
       persistLabels(labels, state.settings.activeLabel === removed ? '' : state.settings.activeLabel); return;
     }
@@ -441,7 +441,7 @@
     const i = +inp.closest('.label-row').dataset.i, labels = (state.settings.labels || []).slice(), old = labels[i] && labels[i].name;
     const name = NN.squash(inp.value);
     if (!name || !old || name === old) { inp.value = old || ''; return; }
-    if (labels.some((x, j) => j !== i && x.name === name)) { alert('Đã có nhãn tên này.'); inp.value = old; return; }
+    if (labels.some((x, j) => j !== i && x.name === name)) { alert('A label with this name already exists.'); inp.value = old; return; }
     labels[i] = { name, color: labels[i].color };
     persistLabels(labels, state.settings.activeLabel === old ? name : state.settings.activeLabel);
   });
@@ -450,7 +450,7 @@
   function addLabel() {
     const name = NN.squash($('#newLabelName').value); if (!name) return;
     const labels = (state.settings.labels || []).slice();
-    if (labels.some(x => x.name === name)) { alert('Đã có nhãn tên này.'); return; }
+    if (labels.some(x => x.name === name)) { alert('A label with this name already exists.'); return; }
     const picked = $('#newLabelColors .sw[aria-pressed="true"]');
     labels.push({ name, color: picked ? picked.dataset.color : 'amber' });
     $('#newLabelName').value = ''; persistLabels(labels);
@@ -466,7 +466,7 @@
     $('#autoSync').checked = s.autoSync !== false;
     renderLabelEditor();
     const all = NN.live(state.notes), st = NN.studyStats(state.notes);
-    $('#stat').textContent = all.length + ' đoạn · ' + st.studying + ' đang học · ' + st.due + ' đến hạn' + (s.lastSync ? ' · đồng bộ ' + when(s.lastSync) + ' trước' : '');
+    $('#stat').textContent = all.length + ' passages · ' + st.studying + ' in study · ' + st.due + ' due' + (s.lastSync ? ' · synced ' + when(s.lastSync) + ' ago' : '');
     $('#setMsg').textContent = '';
     $('#setSheet').hidden = false;
   }
@@ -480,7 +480,7 @@
     }).then(s => { state.settings = s; $('#setSheet').hidden = true; renderAll(); });
   }
 
-  /* ---------------- ĐỒNG BỘ ---------------- */
+  /* ---------------- SYNC ---------------- */
   function nnPost(url, bodyObj) {
     const body = JSON.stringify(bodyObj);
     const H = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.CapacitorHttp;
@@ -494,32 +494,32 @@
   let syncing = false;
   function syncNow() {
     const s = state.settings;
-    if (!s.syncUrl) { toast('Chưa cài link đồng bộ'); openSettings(); return Promise.resolve(); }
+    if (!s.syncUrl) { toast('No sync URL configured'); openSettings(); return Promise.resolve(); }
     if (syncing) return Promise.resolve();
     syncing = true;
-    toast('Đang đồng bộ…');
+    toast('Syncing…');
     return NN.getNotes().then(local =>
       nnPost(s.syncUrl, { action: 'sync', key: s.syncKey || '', notes: local }).then(data => {
-        if (!data || !data.ok) throw new Error((data && data.error) || 'Lỗi máy chủ');
+        if (!data || !data.ok) throw new Error((data && data.error) || 'Server error');
         const m = NN.merge(local, data.notes || {});
         return NN.setNotes(m.notes).then(() => NN.saveSettings({ lastSync: Date.now() })).then(() => {
-          return load().then(() => toast('Đồng bộ xong · ' + NN.live(m.notes).length + ' đoạn'));
+          return load().then(() => toast('Synced · ' + NN.live(m.notes).length + ' passages'));
         });
       })
-    ).catch(err => { toast('Lỗi đồng bộ: ' + (err.message || err)); }).then(() => { syncing = false; });
+    ).catch(err => { toast('Sync error: ' + (err.message || err)); }).then(() => { syncing = false; });
   }
   function autoSync() { if (state.settings.autoSync !== false && state.settings.syncUrl) syncNow(); }
   $('#btnSync').addEventListener('click', syncNow);
   $('#syncNow2').addEventListener('click', () => { saveSettingsClose(); setTimeout(syncNow, 50); });
 
-  /* ---------------- SAO LƯU / NHẬP ---------------- */
+  /* ---------------- BACKUP / IMPORT ---------------- */
   $('#btnBackup').addEventListener('click', () => {
     NN.getNotes().then(notes => {
       const data = JSON.stringify({ app: 'neuron-note', version: 1, exportedAt: Date.now(), notes }, null, 2);
       const a = document.createElement('a');
       a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
       a.download = 'neuron-note-backup.json'; a.click();
-      toast('Đã tạo bản sao lưu');
+      toast('Backup created');
     });
   });
   $('#btnRestore').addEventListener('click', () => $('#fileInput').click());
@@ -531,15 +531,15 @@
         const data = JSON.parse(r.result), incoming = data.notes || data;
         NN.getNotes().then(local => {
           const m = NN.merge(local, incoming);
-          NN.setNotes(m.notes).then(() => load()).then(() => toast('Đã nhập ' + m.added + ' đoạn mới'));
+          NN.setNotes(m.notes).then(() => load()).then(() => toast('Imported ' + m.added + ' new passages'));
         });
-      } catch (err) { toast('Tệp không đọc được'); }
+      } catch (err) { toast('Could not read the file'); }
       e.target.value = '';
     };
     r.readAsText(f);
   });
 
-  /* ---------------- NHẬN TEXT TỪ HỆ THỐNG (ACTION_PROCESS_TEXT / SEND) ---------------- */
+  /* ---------------- RECEIVE SYSTEM TEXT (ACTION_PROCESS_TEXT / SEND) ---------------- */
   function checkIncoming() {
     const p = (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.Preferences);
     const readKey = () => p ? p.get({ key: 'incomingText' }) : Promise.resolve({ value: (function () { try { return localStorage.getItem('incomingText'); } catch (e) { return null; } })() });
@@ -549,11 +549,11 @@
       let obj; try { obj = JSON.parse(raw); } catch (e) { obj = { text: raw, ts: Date.now() }; }
       return removeKey().then(() => {
         if (!obj || !obj.text) return;
-        if (obj.ts && Date.now() - obj.ts > 60000) return; // quá cũ, bỏ
+        if (obj.ts && Date.now() - obj.ts > 60000) return; // too old, skip
         const text = NN.squash(obj.text); if (!text) return;
         const active = state.settings.activeLabel || '';
         saveNewNote({ text, tags: active ? [active] : [], url: isHttp(obj.text) ? obj.text : '' })
-          .then(() => { toast('Đã lưu vào Neuron Note' + (active ? ' · #' + active : '')); switchTab('lib'); });
+          .then(() => { toast('Saved to Neuron Note' + (active ? ' · #' + active : '')); switchTab('lib'); });
       });
     }).catch(() => {});
   }
@@ -564,7 +564,7 @@
     Capacitor.Plugins.App.addListener('appStateChange', st => { if (st && st.isActive) checkIncoming(); });
   }
 
-  /* ---------------- TAB ---------------- */
+  /* ---------------- TABS ---------------- */
   function switchTab(tab) {
     state.tab = tab;
     $$('.screen').forEach(s => { s.hidden = s.id !== 'scr-' + tab; });
@@ -574,9 +574,9 @@
   }
   $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
-  /* ---------------- KHỞI ĐỘNG ---------------- */
+  /* ---------------- STARTUP ---------------- */
   load().then(() => { checkIncoming(); });
 
-  // cho test truy cập
+  // expose for tests
   window.__NN_APP__ = { state, load, saveNewNote, switchTab, checkIncoming, syncNow, openStudy, mobileFragUrl };
 })();

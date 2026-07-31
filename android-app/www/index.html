@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<!-- ==== SỔ TAY ==== -->
+<!-- ==== NOTEBOOK ==== -->
 <section class="screen" id="scr-lib">
   <header class="hdr">
     <div class="brand">
@@ -24,21 +24,21 @@
       <span class="wordmark">Neuron<em>Note</em></span>
     </div>
     <div class="hdr-actions">
-      <button class="icon-btn" id="btnSync" title="Đồng bộ">⟳</button>
-      <button class="icon-btn" id="btnSettings" title="Cài đặt">⚙</button>
+      <button class="icon-btn" id="btnSync" title="Sync">⟳</button>
+      <button class="icon-btn" id="btnSettings" title="Settings">⚙</button>
     </div>
   </header>
 
   <div class="searchbar">
-    <input type="search" id="q" placeholder="Tìm trong đoạn đã lưu…" autocomplete="off">
+    <input type="search" id="q" placeholder="Search saved passages…" autocomplete="off">
   </div>
 
   <div class="chips-scroll" id="labelFilter"></div>
   <div class="tag-filter" id="tagFilterBar" hidden>
     <span id="tagFilterCount" class="tfc"></span>
     <div class="seg">
-      <button data-mode="any" aria-pressed="true">bất kỳ</button>
-      <button data-mode="all" aria-pressed="false">tất cả</button>
+      <button data-mode="any" aria-pressed="true">any</button>
+      <button data-mode="all" aria-pressed="false">all</button>
     </div>
     <button class="tf-clear" data-clear>✕</button>
   </div>
@@ -46,16 +46,16 @@
   <div class="lib-count" id="libCount"></div>
   <div class="list" id="list"></div>
   <div class="empty" id="empty" hidden>
-    <p class="empty-title">Chưa có đoạn nào</p>
-    <p class="empty-body">Bôi đen chữ trong bất kỳ ứng dụng nào → chọn <b>Save to Neuron Note</b>,
-      hoặc dùng tab <b>Thêm</b> để dán và lưu.</p>
+    <p class="empty-title">No passages yet</p>
+    <p class="empty-body">Select text in any app → choose <b>Save to Neuron Note</b>,
+      or use the <b>Add</b> tab to paste and save.</p>
   </div>
 </section>
 
-<!-- ==== HỌC ==== -->
+<!-- ==== STUDY ==== -->
 <section class="screen" id="scr-study" hidden>
   <header class="hdr">
-    <div class="brand"><span class="wordmark">Học</span></div>
+    <div class="brand"><span class="wordmark">Study</span></div>
     <div class="study-progress" id="studyProgress"></div>
   </header>
   <div class="study-stage" id="studyStage"></div>
@@ -63,51 +63,51 @@
     <svg viewBox="0 0 64 64" class="done-glyph" aria-hidden="true">
       <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 33 l9 9 l16 -20"/></g>
     </svg>
-    <p class="done-title" id="doneTitle">Hết phần đến hạn</p>
+    <p class="done-title" id="doneTitle">All caught up</p>
     <p class="done-body" id="doneBody"></p>
   </div>
 </section>
 
-<!-- ==== THÊM (dán & lưu) ==== -->
+<!-- ==== ADD (paste & save) ==== -->
 <section class="screen" id="scr-add" hidden>
-  <header class="hdr"><div class="brand"><span class="wordmark">Thêm ghi chú</span></div></header>
+  <header class="hdr"><div class="brand"><span class="wordmark">Add a note</span></div></header>
   <div class="add-body">
-    <label class="fld-lbl">Đoạn văn</label>
-    <textarea id="addText" class="add-text" placeholder="Dán hoặc gõ đoạn cần lưu…"></textarea>
-    <label class="fld-lbl">Ghi chú (có thể thêm sau)</label>
-    <textarea id="addNote" class="add-note" placeholder="Vì sao đáng nhớ?"></textarea>
-    <label class="fld-lbl">Nhãn</label>
+    <label class="fld-lbl">Passage</label>
+    <textarea id="addText" class="add-text" placeholder="Paste or type the passage to save…"></textarea>
+    <label class="fld-lbl">Note (optional, add later)</label>
+    <textarea id="addNote" class="add-note" placeholder="Why is it worth remembering?"></textarea>
+    <label class="fld-lbl">Labels</label>
     <div class="lbl-picker" id="addPicker"></div>
-    <button class="btn big" id="addSave">Lưu vào Neuron Note</button>
-    <button class="btn ghost big" id="addPaste">📋 Dán từ clipboard</button>
+    <button class="btn big" id="addSave">Save to Neuron Note</button>
+    <button class="btn ghost big" id="addPaste">📋 Paste from clipboard</button>
   </div>
 </section>
 
 <!-- ==== TAB BAR ==== -->
 <nav class="tabbar">
-  <button class="tab on" data-tab="lib"><span class="ti">▤</span>Sổ tay</button>
-  <button class="tab" data-tab="study"><span class="ti">◆</span>Học<span class="tab-badge" id="tabDue" hidden>0</span></button>
-  <button class="tab" data-tab="add"><span class="ti">＋</span>Thêm</button>
+  <button class="tab on" data-tab="lib"><span class="ti">▤</span>Notebook</button>
+  <button class="tab" data-tab="study"><span class="ti">◆</span>Study<span class="tab-badge" id="tabDue" hidden>0</span></button>
+  <button class="tab" data-tab="add"><span class="ti">＋</span>Add</button>
 </nav>
 
 <!-- ==== EDITOR (bottom sheet) ==== -->
 <div class="sheet" id="editSheet" hidden>
   <div class="sheet-card">
-    <div class="sheet-head"><h2>Sửa ghi chú</h2><button class="x" id="editClose">✕</button></div>
+    <div class="sheet-head"><h2>Edit note</h2><button class="x" id="editClose">✕</button></div>
     <div class="sheet-body">
       <blockquote class="edit-quote" id="editQuote"></blockquote>
-      <label class="fld-lbl">Ghi chú</label>
+      <label class="fld-lbl">Note</label>
       <textarea id="editNote" class="add-note"></textarea>
-      <label class="fld-lbl">Nhãn</label>
+      <label class="fld-lbl">Labels</label>
       <div class="lbl-picker" id="editPicker"></div>
       <div class="study-ctl">
-        <label class="mini-check"><input type="checkbox" id="editLearn"> Đưa vào lịch học</label>
-        <label class="mini-check"><input type="checkbox" id="editKnown"> Đã thuộc (bỏ khỏi học)</label>
+        <label class="mini-check"><input type="checkbox" id="editLearn"> Add to study schedule</label>
+        <label class="mini-check"><input type="checkbox" id="editKnown"> Mastered (remove from study)</label>
       </div>
     </div>
     <div class="sheet-foot">
-      <button class="btn danger" id="editDelete">Xoá</button>
-      <button class="btn" id="editSave">Lưu</button>
+      <button class="btn danger" id="editDelete">Delete</button>
+      <button class="btn" id="editSave">Save</button>
     </div>
   </div>
 </div>
@@ -115,39 +115,39 @@
 <!-- ==== SETTINGS (bottom sheet) ==== -->
 <div class="sheet" id="setSheet" hidden>
   <div class="sheet-card">
-    <div class="sheet-head"><h2>Cài đặt</h2><button class="x" id="setClose">✕</button></div>
+    <div class="sheet-head"><h2>Settings</h2><button class="x" id="setClose">✕</button></div>
     <div class="sheet-body">
-      <h3>Đồng bộ với máy tính</h3>
-      <p class="hint">Dán đúng link Web App Apps Script bạn đã dùng cho extension trên máy tính.</p>
-      <label class="fld-lbl">Link Web App</label>
+      <h3>Sync with desktop</h3>
+      <p class="hint">Paste the exact Apps Script Web App URL you used for the desktop extension.</p>
+      <label class="fld-lbl">Web App URL</label>
       <input type="text" id="syncUrl" placeholder="https://script.google.com/macros/s/…/exec">
-      <label class="fld-lbl">Mã bí mật (để trống nếu không đặt)</label>
-      <input type="text" id="syncKey" placeholder="Trùng với SECRET trong Code.gs">
-      <label class="mini-check big-check"><input type="checkbox" id="autoSync"> Tự đồng bộ sau mỗi thay đổi</label>
-      <button class="btn ghost" id="syncNow2">Đồng bộ ngay</button>
+      <label class="fld-lbl">Secret (leave empty if none)</label>
+      <input type="text" id="syncKey" placeholder="Matches SECRET in Code.gs">
+      <label class="mini-check big-check"><input type="checkbox" id="autoSync"> Auto-sync after every change</label>
+      <button class="btn ghost" id="syncNow2">Sync now</button>
 
-      <h3>Nhãn của tôi</h3>
+      <h3>My labels</h3>
       <div id="labelEditor" class="label-editor"></div>
       <div class="label-add">
-        <input type="text" id="newLabelName" placeholder="Tên nhãn mới" maxlength="40">
+        <input type="text" id="newLabelName" placeholder="New label name" maxlength="40">
         <div class="swatches" id="newLabelColors"></div>
-        <button class="btn sm" id="newLabelAdd">Thêm</button>
+        <button class="btn sm" id="newLabelAdd">Add</button>
       </div>
 
-      <h3>Nhãn mặc định khi lưu nhanh</h3>
+      <h3>Default label for quick save</h3>
       <div class="lbl-picker" id="activePicker"></div>
 
-      <h3>Dữ liệu</h3>
+      <h3>Data</h3>
       <div class="row">
-        <button class="btn ghost sm" id="btnBackup">Sao lưu JSON</button>
-        <button class="btn ghost sm" id="btnRestore">Nhập JSON</button>
+        <button class="btn ghost sm" id="btnBackup">JSON backup</button>
+        <button class="btn ghost sm" id="btnRestore">Import JSON</button>
         <input type="file" id="fileInput" accept="application/json" hidden>
       </div>
       <p class="hint" id="stat"></p>
     </div>
     <div class="sheet-foot">
       <span class="sheet-msg" id="setMsg"></span>
-      <button class="btn" id="setSave">Xong</button>
+      <button class="btn" id="setSave">Done</button>
     </div>
   </div>
 </div>
