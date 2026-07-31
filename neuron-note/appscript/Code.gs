@@ -1,28 +1,28 @@
 /**
- * Neuron Note — máy chủ đồng bộ chạy trên Google Apps Script.
+ * Neuron Note — sync server running on Google Apps Script.
  *
- * Cách dùng:
- *  1. script.google.com → New project → dán toàn bộ file này.
- *  2. Đổi SECRET bên dưới thành chuỗi của riêng bạn.
- *  3. Ctrl+S để LƯU trước, rồi Deploy → New deployment → Web app
+ * How to use:
+ *  1. script.google.com → New project → paste this entire file.
+ *  2. Change SECRET below to your own string (optional).
+ *  3. Ctrl+S to SAVE first, then Deploy → New deployment → Web app
  *       Execute as: Me
  *       Who has access: Anyone
- *  4. Copy link .../exec dán vào Cài đặt của extension (và app Android sau này).
+ *  4. Copy the .../exec link into the extension's Settings (and the Android app).
  *
- * Lưu ý: luôn LƯU code rồi mới Deploy, và mỗi lần sửa code phải Deploy → New version,
- * nếu không sẽ gặp lỗi "Script function not found: doGet".
+ * Note: always SAVE the code before you Deploy, and each time you edit the code you must
+ * Deploy → New version, otherwise you'll hit "Script function not found: doGet".
  */
 
 /**
- * SECRET: để TRỐNG ('') nghĩa là KHÔNG cần mật khẩu — đồng bộ chạy ngay, giống bản trước.
- * Nếu muốn bảo vệ, đặt một chuỗi ở đây VÀ điền đúng chuỗi đó vào ô "Mã bí mật" của
- * extension (và app Android). Để trống ở đây thì ô "Mã bí mật" bên extension cũng để trống.
+ * SECRET: leave EMPTY ('') to require NO password — sync just works.
+ * To protect it, set a string here AND enter that same string in the extension's
+ * "Secret" field (and the Android app). Empty here = leave the extension's "Secret" empty too.
  */
 var SECRET = '';
 var FILE_NAME = 'neuron-note-data.json';
-var TOMBSTONE_TTL = 90 * 24 * 60 * 60 * 1000;   // 90 ngày
+var TOMBSTONE_TTL = 90 * 24 * 60 * 60 * 1000;   // 90 days
 
-/* ---------- điểm vào ---------- */
+/* ---------- entry points ---------- */
 
 function doGet() {
   return json({ ok: true, app: 'neuron-note', ping: Date.now() });
@@ -33,13 +33,13 @@ function doPost(e) {
   try {
     lock.waitLock(25000);
   } catch (err) {
-    return json({ ok: false, error: 'Máy chủ đang bận, thử lại sau.' });
+    return json({ ok: false, error: 'Server is busy, try again shortly.' });
   }
 
   try {
     var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (SECRET && String(req.key || '') !== SECRET) {
-      return json({ ok: false, error: 'Mã bí mật không đúng.' });
+      return json({ ok: false, error: 'Incorrect secret.' });
     }
 
     var action = req.action || 'sync';
@@ -55,7 +55,7 @@ function doPost(e) {
     if (action === 'push') {
       return json({ ok: true, count: countLive(merged), at: Date.now() });
     }
-    // 'sync': trả lại toàn bộ để hai bên bằng nhau
+    // 'sync': return everything so both sides match
     return json({ ok: true, notes: merged, count: countLive(merged), at: Date.now() });
 
   } catch (err) {
@@ -65,7 +65,7 @@ function doPost(e) {
   }
 }
 
-/* ---------- trộn: bản có updatedAt mới hơn thắng ---------- */
+/* ---------- merge: the entry with a newer updatedAt wins ---------- */
 
 function merge(a, b) {
   var out = {};
@@ -77,7 +77,7 @@ function merge(a, b) {
     var theirs = b[id];
     if (!mine || (theirs.updatedAt || 0) > (mine.updatedAt || 0)) out[id] = theirs;
   }
-  // dọn bia mộ quá hạn
+  // clean up expired tombstones
   var now = Date.now();
   for (id in out) {
     if (out.hasOwnProperty(id) && out[id] && out[id].deleted &&
@@ -94,7 +94,7 @@ function countLive(notes) {
   return n;
 }
 
-/* ---------- đọc/ghi file trên Drive ---------- */
+/* ---------- read/write the file on Drive ---------- */
 
 function getFile() {
   var it = DriveApp.getFilesByName(FILE_NAME);
@@ -121,23 +121,23 @@ function json(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/* ================= EMAIL NHẮC ÔN HẰNG NGÀY =================
- * Chạy tay MỘT LẦN hàm installDailyTrigger() trong trình soạn thảo để đặt lịch
- * gửi email mỗi sáng (khoảng 7h). Muốn đổi giờ thì sửa số 7 bên dưới rồi chạy lại.
- * Email gửi tới chính chủ tài khoản; muốn gửi địa chỉ khác thì đặt RECIPIENT.
+/* ================= DAILY REVIEW EMAIL =================
+ * Run installDailyTrigger() ONCE by hand in the editor to schedule the morning email
+ * (around 7am). To change the time, edit the number below and run it again.
+ * The email is sent to the account owner; to use another address, set RECIPIENT.
  */
-var RECIPIENT = '';            // để trống = gửi tới email của chính bạn
-var DIGEST_HOUR = 7;           // giờ gửi (0..23), giờ theo múi giờ của dự án Apps Script
-var DIGEST_MAX_LIST = 8;       // số đoạn liệt kê trong email
-var SEND_WHEN_EMPTY = false;   // true = vẫn gửi cả khi không có đoạn đến hạn
+var RECIPIENT = '';            // empty = send to your own email
+var DIGEST_HOUR = 7;           // send hour (0..23), in the Apps Script project's time zone
+var DIGEST_MAX_LIST = 8;       // how many passages to list in the email
+var SEND_WHEN_EMPTY = false;   // true = send even when nothing is due
 
 function installDailyTrigger() {
-  // xoá lịch cũ của hàm này để khỏi trùng
+  // remove this function's old triggers to avoid duplicates
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'dailyDigest') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('dailyDigest').timeBased().everyDays(1).atHour(DIGEST_HOUR).create();
-  Logger.log('Đã đặt lịch gửi email lúc ~' + DIGEST_HOUR + 'h mỗi ngày.');
+  Logger.log('Scheduled the email for ~' + DIGEST_HOUR + ':00 every day.');
 }
 
 function srsInStudy(n) {
@@ -170,19 +170,19 @@ function dailyDigest() {
   if (!due.length && !SEND_WHEN_EMPTY) return;
 
   var to = RECIPIENT || Session.getEffectiveUser().getEmail();
-  if (!to) { Logger.log('Không xác định được email người nhận.'); return; }
+  if (!to) { Logger.log('Could not determine the recipient email.'); return; }
 
   var subject = due.length
-    ? 'Neuron Note — ' + due.length + ' đoạn đến hạn ôn hôm nay'
-    : 'Neuron Note — hôm nay không có đoạn đến hạn';
+    ? 'Neuron Note — ' + due.length + ' passages due for review today'
+    : 'Neuron Note — nothing due today';
 
   var lines = [];
-  lines.push('Chào buổi sáng!');
+  lines.push('Good morning!');
   lines.push('');
-  lines.push('Đến hạn ôn: ' + due.length + ' đoạn  ·  Đang trong lịch học: ' + studying + ' đoạn.');
+  lines.push('Due for review: ' + due.length + ' passages  ·  In the study schedule: ' + studying + ' passages.');
   if (due.length) {
     lines.push('');
-    lines.push('Một vài đoạn cần ôn:');
+    lines.push('A few passages to review:');
     due.slice(0, DIGEST_MAX_LIST).forEach(function (n, i) {
       var t = String(n.text || '').replace(/\s+/g, ' ').trim();
       if (t.length > 140) t = t.slice(0, 140) + '…';
@@ -198,20 +198,20 @@ function dailyDigest() {
     });
     if (due.length > DIGEST_MAX_LIST) {
       lines.push('');
-      lines.push('… và ' + (due.length - DIGEST_MAX_LIST) + ' đoạn nữa. Mở extension → Học để ôn hết.');
+      lines.push('… and ' + (due.length - DIGEST_MAX_LIST) + ' more. Open the extension → Study to review them all.');
     }
   }
   lines.push('');
   lines.push('— Neuron Note');
 
   MailApp.sendEmail(to, subject, lines.join('\n'));
-  Logger.log('Đã gửi tới ' + to + ' (' + due.length + ' đoạn đến hạn).');
+  Logger.log('Sent to ' + to + ' (' + due.length + ' passages due).');
 }
 
-/* ---------- tiện ích: chạy tay trong trình soạn thảo để kiểm tra ---------- */
+/* ---------- helpers: run by hand in the editor to test ---------- */
 function testStore() {
-  Logger.log(countLive(readStore()) + ' đoạn đang lưu trên Drive');
+  Logger.log(countLive(readStore()) + ' passages stored on Drive');
 }
-function testDigestNow() {   // gửi thử email ngay, không cần chờ lịch
+function testDigestNow() {   // send a test email now, without waiting for the schedule
   var save = SEND_WHEN_EMPTY; SEND_WHEN_EMPTY = true; dailyDigest(); SEND_WHEN_EMPTY = save;
 }

@@ -6,11 +6,11 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 /**
- * Nhận text từ hệ thống:
- *  - ACTION_PROCESS_TEXT: menu "Save to Neuron Note" khi bôi đen chữ ở bất kỳ app nào.
- *  - ACTION_SEND (text/plain): chia sẻ đoạn chữ tới Neuron Note.
- * Ghi {text, ts} JSON vào SharedPreferences "CapacitorStorage" khoá "incomingText"
- * (đúng nơi Capacitor Preferences đọc), rồi báo cho WebView qua sự kiện cửa sổ.
+ * Receives text from the system:
+ *  - ACTION_PROCESS_TEXT: the "Save to Neuron Note" menu when selecting text in any app.
+ *  - ACTION_SEND (text/plain): sharing a passage to Neuron Note.
+ * Writes {text, ts} JSON into SharedPreferences "CapacitorStorage" under key "incomingText"
+ * (exactly where Capacitor Preferences reads), then notifies the WebView via a window event.
  */
 public class MainActivity extends BridgeActivity {
 
@@ -43,12 +43,12 @@ public class MainActivity extends BridgeActivity {
     String s = text.toString().trim();
     if (s.isEmpty()) return;
 
-    // JSON tối giản, tự thoát ký tự đặc biệt
+    // minimal JSON, escaping special characters
     String json = "{\"text\":\"" + escape(s) + "\",\"ts\":" + System.currentTimeMillis() + "}";
     SharedPreferences prefs = getSharedPreferences("CapacitorStorage", MODE_PRIVATE);
     prefs.edit().putString("incomingText", json).apply();
 
-    // nếu WebView đã sẵn sàng, báo ngay; nếu chưa, app.js sẽ tự đọc lúc khởi động
+    // if the WebView is ready, notify now; if not, app.js reads it on startup
     final String js = "window.dispatchEvent(new Event('nn-incoming-text'));";
     if (this.bridge != null && this.bridge.getWebView() != null) {
       this.bridge.getWebView().post(new Runnable() {
