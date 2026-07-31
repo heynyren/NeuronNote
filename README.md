@@ -34,7 +34,7 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 | Thư mục | Nội dung |
 |---|---|
 | [`neuron-note/`](neuron-note/) | **Extension Chrome/Edge** (Manifest V3) — bản chính. Xem [README](neuron-note/README.md). |
-| [`Neutron note app/`](Neutron%20note%20app/) | **App Android** (Capacitor) — companion, dùng chung backend. Xem [README](Neutron%20note%20app/neuron-note-android/README.md). |
+| [`android-app/`](android-app/) | **App Android** (Capacitor) — companion, dùng chung backend. Xem [README](android-app/README.md). |
 
 ## Tính năng nổi bật
 
@@ -57,7 +57,7 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 Chi tiết + cách bật đồng bộ: [neuron-note/README.md](neuron-note/README.md).
 
 **App Android:** cần Node.js + Android Studio, xem
-[hướng dẫn build](Neutron%20note%20app/neuron-note-android/README.md).
+[hướng dẫn build](android-app/README.md).
 
 ## Riêng tư & dữ liệu
 

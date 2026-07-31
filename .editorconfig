@@ -1,0 +1,28 @@
+# EditorConfig — https://editorconfig.org
+# Chuẩn hóa code style cho mọi editor/IDE.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Script Windows dùng CRLF
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# Gradle / Java / Kotlin theo quy ước 4 khoảng trắng
+[*.{gradle,java,kt,kts}]
+indent_size = 4
+
+# Markdown: giữ trailing space (dùng để xuống dòng)
+[*.md]
+trim_trailing_whitespace = false
+
+# Không áp cho file sinh tự động
+[*.{min.js,min.css}]
+insert_final_newline = false
+trim_trailing_whitespace = false

@@ -25,7 +25,7 @@ captures/
 
 # --- Capacitor (thư mục native tự sinh khi chạy `npx cap sync`) ---
 # Giữ lại mã nguồn, chỉ loại phần build/tạm.
-Neutron note app/neuron-note-android/android/app/src/main/assets/public/
+android-app/android/app/src/main/assets/public/
 
 # --- Gói phát hành (.zip) — nên dùng GitHub Releases thay vì commit ---
 *.zip
