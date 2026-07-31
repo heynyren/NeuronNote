@@ -10,11 +10,11 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-  let PAGE_NOTES = [];   // note đang hiển thị trên trang
+  let PAGE_NOTES = [];   // notes currently shown on the page
   let SETTINGS = {};
   const NN_COLORS = ['amber', 'mint', 'sky', 'rose', 'lilac'];
 
-  /* ================= chỉ mục văn bản ================= */
+  /* ================= text index ================= */
   const BLOCK = {
     P: 1, DIV: 1, LI: 1, TD: 1, TH: 1, TR: 1, BLOCKQUOTE: 1, PRE: 1,
     H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, ARTICLE: 1, SECTION: 1,
@@ -30,8 +30,8 @@
     return document.body;
   }
 
-  // Các nhánh cần BỎ QUA khi đọc text: bản MathML ẩn của KaTeX/MathJax, mã TeX gốc,
-  // và text chỉ dành cho trình đọc màn hình. Nhờ đó công thức toán chỉ còn MỘT bản hiện.
+  // Branches to SKIP when reading text: KaTeX/MathJax hidden MathML, raw TeX source,
+  // and screen-reader-only text. This leaves math formulas as a SINGLE visible copy.
   const SKIP_SEL = '.katex-mathml, annotation, mjx-assistive-mml, .MathJax_Preview, ' +
     '.MJX_Assistive_MathML, .sr-only, .visually-hidden, [data-nn-skip]';
   function inSkip(node) {
@@ -52,9 +52,9 @@
   }
 
   /**
-   * Chỉ mục text của một gốc bất kỳ (cả trang hoặc một mảnh clone), chuẩn hoá khoảng
-   * trắng VÀ chèn dấu cách ở ranh giới khối — giống cách trình duyệt nối chuỗi khi bôi
-   * đen. map[i] = {node, off} cho từng ký tự; dấu cách chèn ở ranh giới khối = null.
+   * Index the text of any root (the whole page or a cloned fragment), normalizing
+   * whitespace AND inserting a space at block boundaries — like how the browser joins
+   * strings on selection. map[i] = {node, off} per character; a boundary space = null.
    */
   function makeIndex(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: acceptTextNode });
@@ -92,7 +92,7 @@
 
   function buildIndex() { return makeIndex(document.body); }
 
-  /** Đọc text sạch của một Range theo đúng luật trên (để chuỗi lưu khớp với chỉ mục trang). */
+  /** Read a Range's clean text by the same rules (so the saved string matches the page index). */
   function textOfRange(range) {
     try {
       const holder = document.createElement('div');
@@ -103,15 +103,15 @@
     }
   }
 
-  /** Từ khoảng [start,end) trong norm → các đoạn DOM {node,start,end} để bọc <mark>. */
+  /** From range [start,end) in norm → DOM segments {node,start,end} to wrap in <mark>. */
   function rangesFromNorm(idx, start, end) {
     const segs = [];
     let cur = null;
     for (let i = start; i < end; i++) {
       const e = idx.map[i];
-      if (!e) continue;                       // dấu cách chèn ở ranh giới — bỏ qua
+      if (!e) continue;                       // boundary-inserted space — skip
       if (cur && cur.node === e.node) {
-        cur.end = e.off + 1;                  // cùng node → nới rộng (gồm cả khoảng trắng bên trong)
+        cur.end = e.off + 1;                  // same node → extend (including inner whitespace)
       } else {
         if (cur) segs.push(cur);
         cur = { node: e.node, start: e.off, end: e.off + 1 };
@@ -135,13 +135,13 @@
   function firstWords(s, n) { const w = squash(s).split(' ').filter(Boolean); return w.slice(0, n).join(' '); }
   function lastWords(s, n) { const w = squash(s).split(' ').filter(Boolean); return w.slice(-n).join(' '); }
 
-  /** Tìm lại đoạn đã lưu trong trang. Trả về {start, end} theo chỉ số norm, hoặc null. */
+  /** Re-find a saved passage in the page. Returns {start, end} as norm indices, or null. */
   function findAnchor(idx, note) {
     const target = squash(note.text);
     if (!target) return null;
     const hay = idx.norm;
 
-    // 1) khớp nguyên văn (có phân biệt hoa thường, rồi không phân biệt)
+    // 1) exact match (case-sensitive first, then case-insensitive)
     let hits = [];
     let p = hay.indexOf(target);
     while (p !== -1 && hits.length < 80) { hits.push(p); p = hay.indexOf(target, p + 1); }
@@ -167,8 +167,8 @@
       return { start: pos, end: pos + target.length };
     }
 
-    // 2) dự phòng cho đoạn dài: khớp mấy từ đầu + mấy từ cuối, lấy cả khoảng ở giữa.
-    //    Chịu được vài ký tự lạ chen giữa (chú thích, biểu tượng, tách node…).
+    // 2) fallback for long passages: match a few head words + a few tail words, take the span.
+    //    Tolerates a few stray characters in between (footnotes, symbols, node splits…).
     const words = target.split(' ');
     if (words.length >= 8) {
       const head = firstWords(target, 6);
@@ -188,7 +188,7 @@
     return null;
   }
 
-  /* ================= vẽ highlight ================= */
+  /* ================= draw highlight ================= */
   function paint(note) {
     if (document.querySelector('mark.nn-hl[data-nn="' + cssEsc(note.id) + '"]')) return true;
     const idx = buildIndex();
@@ -199,8 +199,8 @@
     if (!segs.length) return false;
 
     const hasNote = squash(note.note) || (note.tags || []).length;
-    // bọc từ đoạn CUỐI về ĐẦU: splitText làm lệch offset của chính node đó,
-    // nhưng các node khác không ảnh hưởng, nên xử lý ngược để an toàn
+    // wrap from LAST segment to FIRST: splitText shifts that node's own offset,
+    // but other nodes are unaffected, so iterate backwards to stay safe
     for (let i = segs.length - 1; i >= 0; i--) {
       const seg = segs[i];
       let node = seg.node;
@@ -215,10 +215,10 @@
         m.dataset.nn = note.id;
         m.dataset.nncolor = note.color || 'amber';
         if (hasNote) m.dataset.nnnote = '1';
-        m.title = 'Neuron Note — bấm để xem ghi chú';
+        m.title = 'Neuron Note — click to view the note';
         node.parentNode.insertBefore(m, node);
         m.appendChild(node);
-      } catch (e) { /* bỏ qua đoạn không tách được */ }
+      } catch (e) { /* skip a segment that can't be split */ }
     }
     return true;
   }
@@ -257,7 +257,7 @@
     return true;
   }
 
-  /* ================= khôi phục khi mở trang ================= */
+  /* ================= restore on page open ================= */
   function restore(retry) {
     chrome.runtime.sendMessage({ type: 'GET_PAGE_NOTES', url: location.href }, res => {
       if (chrome.runtime.lastError || !res) return;
@@ -275,7 +275,7 @@
           return;
         }
       }
-      // trang tải nội dung động → thử lại vài lần
+      // dynamically-loaded page → retry a few times
       if (missed && (retry || 0) < 6) setTimeout(() => restore((retry || 0) + 1), 900);
     });
   }
@@ -290,7 +290,7 @@
     if (id) flash(id, true);
   });
 
-  /* ================= giao diện nổi (Shadow DOM) ================= */
+  /* ================= floating UI (Shadow DOM) ================= */
   let host, shadow;
   function ui() {
     if (shadow) return shadow;
@@ -422,7 +422,7 @@
     setTimeout(() => el.remove(), 3200);
   }
 
-  /** Toast sau khi lưu thẳng: có Hoàn tác và Ghi chú (mở thẻ khi cần), tự biến mất. */
+  /** Toast after a direct save: has Undo and Note (opens the card if needed), auto-dismisses. */
   function savedToast(text, note) {
     const sh = ui();
     const root = sh.getElementById('root');
@@ -437,20 +437,20 @@
 
     const undo = document.createElement('button');
     undo.className = 'btn ghost';
-    undo.textContent = 'Hoàn tác';
+    undo.textContent = 'Undo';
     undo.addEventListener('click', () => {
       chrome.runtime.sendMessage({ type: 'DELETE_NOTE', id: note.id }, () => {
         unpaint(note.id);
         PAGE_NOTES = PAGE_NOTES.filter(n => n.id !== note.id);
         el.remove();
-        toast('Đã hoàn tác');
+        toast('Undone');
       });
     });
     el.appendChild(undo);
 
     const edit = document.createElement('button');
     edit.className = 'btn ghost';
-    edit.textContent = 'Ghi chú';
+    edit.textContent = 'Note';
     edit.addEventListener('click', () => {
       el.remove();
       const m = document.querySelector('mark.nn-hl[data-nn="' + cssEsc(note.id) + '"]');
@@ -462,7 +462,7 @@
     setTimeout(() => { if (el.isConnected) el.remove(); }, 5000);
   }
 
-  /** Thẻ ghi chú: dùng cho cả lúc vừa lưu và lúc bấm vào highlight. */
+  /** Note card: used both right after saving and when clicking a highlight. */
   function openCard(note, rect, mode) {
     const sh = ui();
     const root = sh.getElementById('root');
@@ -472,8 +472,8 @@
     const el = document.createElement('div');
     el.className = 'card';
     el.innerHTML = `
-      <div class="head"><span class="dot"></span><span>${editing ? 'Ghi chú' : 'Neuron Note'}</span>
-        <button class="x" aria-label="Đóng">✕</button></div>
+      <div class="head"><span class="dot"></span><span>${editing ? 'Note' : 'Neuron Note'}</span>
+        <button class="x" aria-label="Close">✕</button></div>
       <blockquote class="quote"></blockquote>
       <div class="body"></div>`;
     el.querySelector('.quote').textContent = note.text;
@@ -481,20 +481,20 @@
     const body = el.querySelector('.body');
     if (editing) {
       body.innerHTML = `
-        <div class="field"><label>Ghi chú</label>
-          <textarea placeholder="Vì sao đoạn này đáng nhớ?"></textarea></div>
-        <div class="field"><label>Nhãn</label>
+        <div class="field"><label>Note</label>
+          <textarea placeholder="Why is this passage worth remembering?"></textarea></div>
+        <div class="field"><label>Labels</label>
           <div class="lbl-picker"></div></div>
         <div class="swatches"></div>
         <div class="row">
-          <button class="btn" data-act="save">Lưu</button>
-          <button class="btn ghost" data-act="link">Chép link</button>
-          <button class="btn danger" data-act="del">Xoá</button>
+          <button class="btn" data-act="save">Save</button>
+          <button class="btn ghost" data-act="link">Copy link</button>
+          <button class="btn danger" data-act="del">Delete</button>
         </div>`;
       const ta = body.querySelector('textarea');
       ta.value = note.note || '';
 
-      // bộ chọn nhãn: các nhãn định sẵn + nhãn lẻ của note + ô thêm mới
+      // label picker: predefined labels + the note's ad-hoc labels + a new-label input
       const picker = body.querySelector('.lbl-picker');
       const have = new Set(note.tags || []);
       const defined = (SETTINGS.labels || []);
@@ -520,9 +520,9 @@
       const addWrap = document.createElement('span');
       addWrap.className = 'lchip-add';
       const addBtn = document.createElement('button');
-      addBtn.type = 'button'; addBtn.className = 'lchip add'; addBtn.textContent = '＋ nhãn';
+      addBtn.type = 'button'; addBtn.className = 'lchip add'; addBtn.textContent = '＋ label';
       const addInp = document.createElement('input');
-      addInp.type = 'text'; addInp.className = 'lchip-input'; addInp.placeholder = 'Tên nhãn mới'; addInp.hidden = true;
+      addInp.type = 'text'; addInp.className = 'lchip-input'; addInp.placeholder = 'New label name'; addInp.hidden = true;
       addBtn.addEventListener('click', () => { addInp.hidden = false; addInp.focus(); });
       addInp.addEventListener('keydown', ev => {
         if (ev.key === 'Escape') { addInp.hidden = true; addInp.value = ''; return; }
@@ -568,7 +568,7 @@
             if (i >= 0) PAGE_NOTES[i] = res.note; else PAGE_NOTES.push(res.note);
             repaint(res.note);
             clearUI();
-            toast('Đã lưu ghi chú');
+            toast('Note saved');
           }
         });
       });
@@ -578,7 +578,7 @@
           unpaint(note.id);
           PAGE_NOTES = PAGE_NOTES.filter(n => n.id !== note.id);
           clearUI();
-          toast('Đã xoá khỏi Neuron Note');
+          toast('Deleted from Neuron Note');
         });
       });
       setTimeout(() => ta.focus(), 30);
@@ -588,9 +588,9 @@
         (tags ? '<div class="tags">' + tags + '</div>' : '') +
         (squash(note.note) ? '<p class="note-text">' + esc(note.note) + '</p>' : '') +
         `<div class="row">
-           <button class="btn" data-act="edit">Sửa</button>
-           <button class="btn ghost" data-act="link">Chép link</button>
-           <button class="btn danger" data-act="del">Xoá</button>
+           <button class="btn" data-act="edit">Edit</button>
+           <button class="btn ghost" data-act="link">Copy link</button>
+           <button class="btn danger" data-act="del">Delete</button>
          </div>`;
       body.querySelector('[data-act=edit]').addEventListener('click', () => openCard(note, rect, 'edit'));
       body.querySelector('[data-act=link]').addEventListener('click', () => copyLink(note));
@@ -599,7 +599,7 @@
           unpaint(note.id);
           PAGE_NOTES = PAGE_NOTES.filter(n => n.id !== note.id);
           clearUI();
-          toast('Đã xoá khỏi Neuron Note');
+          toast('Deleted from Neuron Note');
         });
       });
     }
@@ -613,12 +613,12 @@
   function copyLink(note) {
     const url = note.fragUrl || note.url;
     navigator.clipboard.writeText(url).then(
-      () => toast('Đã chép link tới đoạn này'),
-      () => toast('Không chép được — hãy mở thư viện để lấy link')
+      () => toast('Copied a link to this passage'),
+      () => toast('Could not copy — open the library to get the link')
     );
   }
 
-  /* đóng thẻ khi bấm ra ngoài / nhấn Esc */
+  /* close the card when clicking outside / pressing Esc */
   document.addEventListener('mousedown', e => {
     if (!shadow) return;
     if (host.contains(e.target)) return;
@@ -629,11 +629,11 @@
   }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') clearUI(); }, true);
 
-  /* bấm vào highlight → mở thẻ */
+  /* click a highlight → open the card */
   document.addEventListener('click', e => {
     const m = e.target && e.target.closest ? e.target.closest('mark.nn-hl') : null;
     if (!m) return;
-    // giữ Ctrl/Cmd hoặc chuột giữa → để trang xử lý như bình thường (vd highlight nằm trong link)
+    // holding Ctrl/Cmd or middle-click → let the page handle it normally (e.g. highlight inside a link)
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
     const id = m.dataset.nn;
     const note = PAGE_NOTES.find(n => n.id === id);
@@ -643,7 +643,7 @@
     openCard(note, m.getBoundingClientRect(), 'view');
   }, true);
 
-  /* ================= bắt vùng bôi đen ================= */
+  /* ================= capture the selection ================= */
   function contextAround(range) {
     const out = { prefix: '', suffix: '' };
     try {
@@ -660,7 +660,7 @@
       post.collapse(false);
       post.setEnd(block, block.childNodes.length);
       out.suffix = squash(textOfRange(post)).slice(0, 60);
-    } catch (e) { /* trang lạ — bỏ ngữ cảnh */ }
+    } catch (e) { /* unusual page — skip context */ }
     return out;
   }
 
@@ -668,8 +668,8 @@
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
     const range = sel.getRangeAt(0);
-    // Lấy text bằng đúng luật của chỉ mục trang (bỏ math ẩn, chuẩn hoá khoảng trắng)
-    // để chuỗi lưu luôn khớp khi tô lại. Dự phòng bằng selection.toString() nếu cần.
+    // Read text by the same page-index rules (drop hidden math, normalize whitespace)
+    // so the saved string always matches when re-highlighting. Fall back to selection.toString().
     let text = squash(textOfRange(range));
     if (!text) text = squash(sel.toString());
     if (!text) return null;
@@ -684,7 +684,7 @@
     };
   }
 
-  /* ================= nhận lệnh từ background ================= */
+  /* ================= receive commands from background ================= */
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     switch (msg && msg.type) {
       case 'PING':
@@ -706,8 +706,8 @@
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
         const label = msg.label ? ' · #' + msg.label : '';
-        // lưu thẳng, không mở thẻ; chỉ báo nhẹ kèm lối tắt Hoàn tác / Ghi chú
-        savedToast('Đã lưu' + label, note);
+        // direct save, no card; just a light toast with Undo / Note shortcuts
+        savedToast('Saved' + label, note);
         sendResponse({ ok: true });
         return;
       }
@@ -723,7 +723,7 @@
     }
   });
 
-  /* ================= khởi động ================= */
+  /* ================= startup ================= */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => restore(0));
   } else {

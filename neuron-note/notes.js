@@ -1,4 +1,4 @@
-/* Neuron Note — thư viện */
+/* Neuron Note — library */
 (function () {
   'use strict';
 
@@ -9,27 +9,27 @@
     notes: {},
     settings: {},
     q: '',
-    tags: [],          // nhiều nhãn cùng lúc
-    tagMode: 'any',    // 'any' = có bất kỳ | 'all' = có tất cả
+    tags: [],          // multiple labels at once
+    tagMode: 'any',    // 'any' = has any | 'all' = has all
     site: null,
     sort: 'new'
   };
 
-  /* ---------- thời gian ---------- */
+  /* ---------- time ---------- */
   function when(ts) {
     if (!ts) return '';
     const d = Date.now() - ts;
     const m = Math.floor(d / 60000);
-    if (m < 1) return 'vừa xong';
-    if (m < 60) return m + ' phút trước';
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
     const h = Math.floor(m / 60);
-    if (h < 24) return h + ' giờ trước';
+    if (h < 24) return h + ' h ago';
     const day = Math.floor(h / 24);
-    if (day < 7) return day + ' ngày trước';
-    return new Date(ts).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    if (day < 7) return day + ' days ago';
+    return new Date(ts).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
-  /* ---------- nạp dữ liệu ---------- */
+  /* ---------- load data ---------- */
   function load() {
     return NN.getAll().then(r => {
       state.notes = r.notes;
@@ -68,22 +68,22 @@
     return list;
   }
 
-  /* ---------- vẽ ---------- */
+  /* ---------- render ---------- */
   function render() {
     const list = visible();
     const all = NN.live(state.notes);
 
-    $('#count').textContent = list.length + ' đoạn';
+    $('#count').textContent = list.length + ' passages';
     $('#crumb').textContent = state.tags.length ? state.tags.map(t => '#' + t).join(state.tagMode === 'all' ? ' + ' : ' / ')
       : state.site ? state.site
-      : state.q ? 'Kết quả tìm' : 'Tất cả';
+      : state.q ? 'Search results' : 'All';
 
-    // Nhãn của tôi (định sẵn) + đếm số note đang dùng
+    // My labels (predefined) + count of notes using each
     const usedCount = {};
     all.forEach(n => (n.tags || []).forEach(t => { usedCount[t] = (usedCount[t] || 0) + 1; }));
     const labels = state.settings.labels || [];
     const active = state.settings.activeLabel || '';
-    // nhãn định sẵn trước, rồi tới các nhãn lẻ đã dùng nhưng chưa định sẵn
+    // predefined labels first, then ad-hoc labels used but not predefined
     const defined = labels.map(l => l.name);
     const extras = Object.keys(usedCount).filter(t => !defined.includes(t)).sort();
 
@@ -92,7 +92,7 @@
         <span class="dot ${esc(l.color || 'amber')}"></span>
         <span class="nm">${esc(l.name)}</span>
         <span class="n">${usedCount[l.name] || 0}</span>
-        <span class="star ${active === l.name ? 'on' : ''}" title="Nhãn mặc định">${active === l.name ? '★' : '☆'}</span>
+        <span class="star ${active === l.name ? 'on' : ''}" title="Default label">${active === l.name ? '★' : '☆'}</span>
       </button></li>`).join('');
     labHtml += extras.map(t => `
       <li><button class="lab" data-tag="${esc(t)}" aria-pressed="${state.tags.includes(t)}">
@@ -100,30 +100,30 @@
         <span class="nm">${esc(t)}</span><span class="n">${usedCount[t]}</span>
       </button></li>`).join('');
     if (!labels.length && !extras.length) {
-      labHtml = '<li class="empty-note">Chưa có nhãn. Bấm ＋ để tạo nhãn đầu tiên.</li>';
+      labHtml = '<li class="empty-note">No labels yet. Click ＋ to create your first.</li>';
     }
     $('#labelList').innerHTML = labHtml;
 
-    // thanh công cụ lọc nhãn: AND/OR + xoá lọc, chỉ hiện khi có nhãn đang chọn
+    // label filter toolbar: AND/OR + clear, only shown when labels are selected
     const bar = $('#tagFilterBar');
     if (state.tags.length) {
       bar.hidden = false;
       bar.querySelector('[data-mode="any"]').setAttribute('aria-pressed', String(state.tagMode === 'any'));
       bar.querySelector('[data-mode="all"]').setAttribute('aria-pressed', String(state.tagMode === 'all'));
-      $('#tagFilterCount').textContent = state.tags.length + ' nhãn';
+      $('#tagFilterCount').textContent = state.tags.length + ' labels';
     } else {
       bar.hidden = true;
     }
 
-    // nguồn
+    // sources
     const siteCount = {};
     all.forEach(n => { const h = NN.hostOf(n.url); if (h) siteCount[h] = (siteCount[h] || 0) + 1; });
     const sites = Object.keys(siteCount).sort((a, b) => siteCount[b] - siteCount[a]);
     $('#siteList').innerHTML = sites.length
       ? sites.map(h => `<li><button class="site" data-site="${esc(h)}" aria-pressed="${state.site === h}"><span class="host">${esc(h)}</span><span class="n">${siteCount[h]}</span></button></li>`).join('')
-      : '<li class="hint" style="font-size:12px;color:var(--muted)">Chưa có nguồn nào</li>';
+      : '<li class="hint" style="font-size:12px;color:var(--muted)">No sources yet</li>';
 
-    // danh sách
+    // list
     $('#empty').hidden = list.length > 0;
     $('#list').innerHTML = list.map(cardHtml).join('');
     updateDuePill();
@@ -146,32 +146,32 @@
       `<button type="button" class="lchip" data-name="${esc(t)}" aria-pressed="true">
         ${labelDot('')}${esc(t)}</button>`).join('');
     html += `<span class="lchip-add">
-        <button type="button" class="lchip add" data-act="addlabel">＋ nhãn</button>
-        <input type="text" class="lchip-input" placeholder="Tên nhãn mới" maxlength="40" hidden>
+        <button type="button" class="lchip add" data-act="addlabel">＋ label</button>
+        <input type="text" class="lchip-input" placeholder="New label name" maxlength="40" hidden>
       </span>`;
     return html;
   }
 
   function dueLabel(ts) {
     const now = Date.now();
-    if (ts <= now) return 'đến hạn';
+    if (ts <= now) return 'due';
     const days = Math.ceil((ts - now) / NN.DAY);
-    if (days <= 1) return 'mai';
-    if (days < 30) return 'còn ' + days + ' ngày';
+    if (days <= 1) return 'tomorrow';
+    if (days < 30) return 'in ' + days + ' days';
     const mo = Math.round(days / 30);
-    return 'còn ~' + mo + ' tháng';
+    return 'in ~' + mo + ' months';
   }
   function srsBadge(n) {
     const s = n.srs || {};
-    if (s.known) return '<span class="srs known">✓ đã thuộc</span>';
-    if (s.learn === false) return '<span class="srs off">ẩn khỏi học</span>';
+    if (s.known) return '<span class="srs known">✓ mastered</span>';
+    if (s.learn === false) return '<span class="srs off">snoozed</span>';
     const due = (s.due || 0) <= Date.now();
-    return `<span class="srs ${due ? 'due' : ''}">bậc ${s.box || 0} · ${dueLabel(s.due || Date.now())}</span>`;
+    return `<span class="srs ${due ? 'due' : ''}">level ${s.box || 0} · ${dueLabel(s.due || Date.now())}</span>`;
   }
   function studyToggleLabel(n) {
     const s = n.srs || {};
-    if (s.known) return 'Học lại';
-    return s.learn === false ? 'Đưa lại vào học' : 'Ẩn khỏi học';
+    if (s.known) return 'Study again';
+    return s.learn === false ? 'Back to study' : 'Snooze';
   }
 
   function cardHtml(n) {
@@ -187,20 +187,20 @@
         ${NN.squash(n.note) ? `<p class="mynote">${esc(n.note)}</p>` : ''}
         ${tags ? `<div class="tagrow">${tags}</div>` : ''}
         <div class="editor">
-          <textarea placeholder="Ghi chú của bạn…">${esc(n.note || '')}</textarea>
-          <label class="editor-lbl">Nhãn</label>
+          <textarea placeholder="Your note…">${esc(n.note || '')}</textarea>
+          <label class="editor-lbl">Labels</label>
           <div class="lbl-picker">${pickerHtml(n)}</div>
           <div class="study-ctl">
-            <label class="mini-check"><input type="checkbox" data-srs="learn" ${(n.srs && n.srs.learn === false) ? '' : 'checked'}> Đưa vào lịch học</label>
-            <label class="mini-check"><input type="checkbox" data-srs="known" ${(n.srs && n.srs.known) ? 'checked' : ''}> Đã thuộc (bỏ khỏi học)</label>
+            <label class="mini-check"><input type="checkbox" data-srs="learn" ${(n.srs && n.srs.learn === false) ? '' : 'checked'}> Add to study schedule</label>
+            <label class="mini-check"><input type="checkbox" data-srs="known" ${(n.srs && n.srs.known) ? 'checked' : ''}> Mastered (remove from study)</label>
           </div>
           <div class="row">
             <div class="swatches">
               ${['amber','mint','sky','rose','lilac'].map(c =>
                 `<button class="sw" data-color="${c}" style="background:var(--${c})" aria-pressed="${(n.color || 'amber') === c}" title="${NN.COLOR_LABEL[c]}"></button>`).join('')}
             </div>
-            <button class="btn sm" data-act="save">Lưu</button>
-            <button class="btn ghost sm" data-act="cancel">Huỷ</button>
+            <button class="btn sm" data-act="save">Save</button>
+            <button class="btn ghost sm" data-act="cancel">Cancel</button>
           </div>
         </div>
         <div class="meta">
@@ -209,30 +209,30 @@
           <span class="sep">·</span><span>${when(n.createdAt)}</span>
           <span class="srs-tag">${srsBadge(n)}</span>
           <span class="acts">
-            <button class="btn link" data-act="open">Mở đoạn</button>
-            <button class="btn link" data-act="copy">Chép link</button>
+            <button class="btn link" data-act="open">Open passage</button>
+            <button class="btn link" data-act="copy">Copy link</button>
             <button class="btn link" data-act="study-toggle">${studyToggleLabel(n)}</button>
-            <button class="btn link" data-act="edit">Sửa</button>
-            <button class="btn link danger" data-act="del">Xoá</button>
+            <button class="btn link" data-act="edit">Edit</button>
+            <button class="btn link danger" data-act="del">Delete</button>
           </span>
         </div>
       </div>
     </article>`;
   }
 
-  /* ---------- tương tác trong danh sách ---------- */
+  /* ---------- interactions in the list ---------- */
   $('#list').addEventListener('click', e => {
     const tagBtn = e.target.closest('.tagrow .t');
     if (tagBtn) { toggleTag(tagBtn.dataset.tag); return; }
 
-    // bật/tắt chip nhãn trong trình sửa
+    // toggle a label chip in the editor
     const lchip = e.target.closest('.lbl-picker .lchip');
     if (lchip && !lchip.classList.contains('add')) {
       const on = lchip.getAttribute('aria-pressed') === 'true';
       lchip.setAttribute('aria-pressed', String(!on));
       return;
     }
-    // mở ô thêm nhãn mới
+    // open the new-label input
     if (e.target.closest('.lchip.add')) {
       const wrap = e.target.closest('.lchip-add');
       const inp = wrap.querySelector('.lchip-input');
@@ -259,7 +259,7 @@
         break;
       case 'copy':
         navigator.clipboard.writeText(note.fragUrl || note.url)
-          .then(() => toast('Đã chép link tới đoạn này'), () => toast('Không chép được link'));
+          .then(() => toast('Copied a link to this passage'), () => toast('Could not copy the link'));
         break;
       case 'edit':
         art.classList.add('editing');
@@ -267,12 +267,12 @@
         break;
       case 'cancel':
         art.classList.remove('editing');
-        render();   // bỏ mọi thay đổi chưa lưu
+        render();   // discard any unsaved changes
         break;
       case 'save': {
         const tags = Array.from(art.querySelectorAll('.lbl-picker .lchip[aria-pressed="true"]'))
           .map(c => c.dataset.name).filter(Boolean);
-        // nhãn nào vừa tạo mới (chưa có trong danh sách) thì thêm vào settings
+        // any freshly created label (not yet in the list) gets added to settings
         const newLabels = tags.filter(t => t && !( state.settings.labels || []).some(l => l.name === t)
           && art.querySelector('.lbl-picker .lchip[data-name="' + cssq(t) + '"].new'));
         const picked = art.querySelector('.sw[aria-pressed="true"]');
@@ -281,7 +281,7 @@
           tags,
           color: picked ? picked.dataset.color : (note.color || 'amber')
         });
-        // trạng thái học
+        // study state
         NN.ensureSrs(next);
         next.srs = Object.assign({}, next.srs);
         const learnCb = art.querySelector('input[data-srs="learn"]');
@@ -299,7 +299,7 @@
 
         afterSettings
           .then(() => NN.putNote(next))
-          .then(() => { state.notes[id] = next; render(); toast('Đã lưu'); autoSync(); });
+          .then(() => { state.notes[id] = next; render(); toast('Saved'); autoSync(); });
         break;
       }
       case 'study-toggle': {
@@ -308,9 +308,9 @@
         next.srs = Object.assign({}, next.srs);
         const s = next.srs;
         let msg;
-        if (s.known) { s.known = false; s.learn = true; msg = 'Đưa lại vào học'; }
-        else if (s.learn === false) { s.learn = true; msg = 'Đưa lại vào học'; }
-        else { s.learn = false; msg = 'Đã ẩn khỏi học'; }
+        if (s.known) { s.known = false; s.learn = true; msg = 'Back to study'; }
+        else if (s.learn === false) { s.learn = true; msg = 'Back to study'; }
+        else { s.learn = false; msg = 'Snoozed from study'; }
         NN.putNote(next).then(() => { state.notes[id] = next; render(); toast(msg); autoSync(); });
         break;
       }
@@ -318,7 +318,7 @@
         NN.removeNote(id).then(() => {
           state.notes[id] = { id, deleted: true, updatedAt: Date.now(), url: note.url, createdAt: note.createdAt };
           render();
-          toast('Đã xoá');
+          toast('Deleted');
           autoSync();
         });
         break;
@@ -327,7 +327,7 @@
 
   function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
-  // tạo nhãn mới ngay trong trình sửa (Enter)
+  // create a new label right in the editor (Enter)
   $('#list').addEventListener('keydown', e => {
     const inp = e.target.closest && e.target.closest('.lchip-input');
     if (!inp) return;
@@ -338,7 +338,7 @@
     if (!name) return;
     const picker = inp.closest('.lbl-picker');
     if (picker.querySelector('.lchip[data-name="' + cssq(name) + '"]')) {
-      // đã có → chỉ bật lên
+      // already exists → just turn it on
       picker.querySelector('.lchip[data-name="' + cssq(name) + '"]').setAttribute('aria-pressed', 'true');
     } else {
       const color = NN.nextLabelColor(state.settings);
@@ -353,7 +353,7 @@
     inp.value = ''; inp.hidden = true;
   });
 
-  /* ---------- bộ lọc ---------- */
+  /* ---------- filters ---------- */
   function toggleTag(name) {
     const i = state.tags.indexOf(name);
     if (i >= 0) state.tags.splice(i, 1);
@@ -378,7 +378,7 @@
   });
   $('#addLabel').addEventListener('click', () => { openSheet(); setTimeout(() => $('#newLabelName').focus(), 60); });
 
-  // thanh AND/OR
+  // AND/OR bar
   $('#tagFilterBar').addEventListener('click', e => {
     const m = e.target.closest('[data-mode]');
     if (m) { state.tagMode = m.dataset.mode; render(); return; }
@@ -404,7 +404,7 @@
   });
   $('#sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
 
-  /* ---------- xuất / nhập ---------- */
+  /* ---------- export / import ---------- */
   function download(name, text, mime) {
     const blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
     const a = document.createElement('a');
@@ -465,17 +465,17 @@
         NN.setNotes(m.notes).then(() => {
           state.notes = m.notes;
           render();
-          toast('Đã nhập ' + m.added + ' đoạn mới, cập nhật ' + m.updated);
+          toast('Imported ' + m.added + ' new, updated ' + m.updated);
         });
       } catch (err) {
-        toast('Tệp không đọc được — cần đúng bản sao lưu JSON của Neuron Note');
+        toast('Could not read the file — needs a valid Neuron Note JSON backup');
       }
       e.target.value = '';
     };
     r.readAsText(f);
   });
 
-  /* ---------- quản lý nhãn ---------- */
+  /* ---------- manage labels ---------- */
   const PALETTE = ['amber', 'mint', 'sky', 'rose', 'lilac'];
 
   function swatchRow(selected, cls) {
@@ -491,14 +491,14 @@
       ? labels.map((l, i) => `
         <div class="label-row" data-i="${i}">
           <span class="dot ${esc(l.color)}"></span>
-          <input class="rn" type="text" value="${esc(l.name)}" maxlength="40" aria-label="Tên nhãn">
+          <input class="rn" type="text" value="${esc(l.name)}" maxlength="40" aria-label="Label name">
           ${swatchRow(l.color)}
-          <button class="set-active ${active === l.name ? 'on' : ''}" title="Đặt làm nhãn mặc định">${active === l.name ? '★ mặc định' : 'đặt mặc định'}</button>
-          <button class="del" title="Xoá nhãn">🗑</button>
+          <button class="set-active ${active === l.name ? 'on' : ''}" title="Set as default label">${active === l.name ? '★ default' : 'set default'}</button>
+          <button class="del" title="Delete label">🗑</button>
         </div>`).join('')
-      : '<p class="hint">Chưa có nhãn nào.</p>';
+      : '<p class="hint">No labels yet.</p>';
     $('#newLabelColors').innerHTML = swatchRow('amber').replace('<div class="swatches ', '<div data-newcolors class="swatches ');
-    // đặt màu mặc định cho ô thêm mới
+    // set the default color for the new-label input
     const first = $('#newLabelColors .sw');
     if (first) first.setAttribute('aria-pressed', 'true');
   }
@@ -509,7 +509,7 @@
     return NN.saveSettings(patch).then(s => { state.settings = s; renderLabelEditor(); render(); });
   }
 
-  // chọn màu trong mọi .swatches của bảng cài đặt
+  // pick a color in any .swatches within the settings sheet
   $('#sheet').addEventListener('click', e => {
     const sw = e.target.closest('.swatches .sw');
     if (sw) {
@@ -526,7 +526,7 @@
     if (!l) return;
 
     if (e.target.closest('.del')) {
-      if (!confirm('Xoá nhãn "' + l.name + '"? Các đoạn đang mang nhãn này vẫn giữ nguyên.')) return;
+      if (!confirm('Delete the label "' + l.name + '"? Passages carrying it are kept.')) return;
       const removed = l.name;
       labels.splice(i, 1);
       const activeLabel = state.settings.activeLabel === removed ? '' : state.settings.activeLabel;
@@ -545,7 +545,7 @@
     }
   });
 
-  // đổi tên khi rời ô input
+  // rename when leaving the input
   $('#labelEditor').addEventListener('change', e => {
     const inp = e.target.closest('.rn');
     if (!inp) return;
@@ -555,7 +555,7 @@
     const old = labels[i] && labels[i].name;
     const name = NN.squash(inp.value);
     if (!name || !old || name === old) { inp.value = old || ''; return; }
-    if (labels.some((x, j) => j !== i && x.name === name)) { alert('Đã có nhãn tên này.'); inp.value = old; return; }
+    if (labels.some((x, j) => j !== i && x.name === name)) { alert('A label with this name already exists.'); inp.value = old; return; }
     labels[i] = { name, color: labels[i].color };
     const activeLabel = state.settings.activeLabel === old ? name : state.settings.activeLabel;
     persistLabels(labels, activeLabel);
@@ -565,7 +565,7 @@
     const name = NN.squash($('#newLabelName').value);
     if (!name) { $('#newLabelName').focus(); return; }
     const labels = (state.settings.labels || []).slice();
-    if (labels.some(x => x.name === name)) { alert('Đã có nhãn tên này.'); return; }
+    if (labels.some(x => x.name === name)) { alert('A label with this name already exists.'); return; }
     const picked = $('#newLabelColors .sw[aria-pressed="true"]');
     const color = picked ? picked.dataset.color : 'amber';
     labels.push({ name, color });
@@ -575,7 +575,7 @@
   $('#newLabelAdd').addEventListener('click', addLabel);
   $('#newLabelName').addEventListener('keydown', e => { if (e.key === 'Enter') addLabel(); });
 
-  /* ---------- cài đặt ---------- */
+  /* ---------- settings ---------- */
   function openSheet() {
     const s = state.settings;
     $('#syncUrl').value = s.syncUrl || '';
@@ -586,7 +586,7 @@
     renderLabelEditor();
     const all = NN.live(state.notes);
     const tombs = Object.values(state.notes).filter(n => n && n.deleted).length;
-    $('#stat').textContent = all.length + ' đoạn đang lưu · ' + tombs + ' dấu xoá chờ đồng bộ';
+    $('#stat').textContent = all.length + ' saved passages · ' + tombs + ' pending deletions';
     $('#sheetMsg').textContent = '';
     $('#sheet').hidden = false;
   }
@@ -604,34 +604,34 @@
       markColor: $('#markColor').value
     }).then(s => {
       state.settings = s;
-      $('#sheetMsg').textContent = 'Đã lưu cài đặt.';
+      $('#sheetMsg').textContent = 'Settings saved.';
       paintSync();
       setTimeout(() => { $('#sheet').hidden = true; }, 600);
     });
   });
 
-  /* ---------- đồng bộ ---------- */
+  /* ---------- sync ---------- */
   function paintSync(msg, cls) {
     const dot = $('#syncDot'), txt = $('#syncText');
     dot.className = 'sync-dot' + (cls ? ' ' + cls : '');
     if (msg) { txt.textContent = msg; return; }
-    if (!state.settings.syncUrl) { txt.textContent = 'Chưa bật đồng bộ'; return; }
+    if (!state.settings.syncUrl) { txt.textContent = 'Sync is off'; return; }
     dot.classList.add('on');
     txt.textContent = state.settings.lastSync
-      ? 'Đồng bộ ' + when(state.settings.lastSync)
-      : 'Sẵn sàng đồng bộ';
+      ? 'Synced ' + when(state.settings.lastSync)
+      : 'Ready to sync';
   }
 
   function doSync() {
     if (!state.settings.syncUrl) { openSheet(); return; }
-    paintSync('Đang đồng bộ…', 'busy');
+    paintSync('Syncing…', 'busy');
     chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, res => {
       if (!res || !res.ok) {
-        paintSync('Lỗi đồng bộ', 'err');
-        toast((res && res.error) || 'Không kết nối được máy chủ');
+        paintSync('Sync error', 'err');
+        toast((res && res.error) || 'Could not reach the server');
         return;
       }
-      load().then(() => toast('Đồng bộ xong · ' + res.total + ' đoạn'));
+      load().then(() => toast('Synced · ' + res.total + ' passages'));
     });
   }
   $('#btnSync').addEventListener('click', doSync);
@@ -652,7 +652,7 @@
     tt = setTimeout(() => { el.hidden = true; }, 2600);
   }
 
-  /* ---------- chế độ Học (SRS) ---------- */
+  /* ---------- study mode (SRS) ---------- */
   const study = { queue: [], i: 0, revealed: false, done: 0 };
 
   function updateDuePill() {
@@ -664,10 +664,10 @@
 
   function buildQueue() {
     const now = Date.now();
-    // đến hạn trong phạm vi bộ lọc hiện tại (nếu đang lọc nhãn/nguồn thì học đúng phần đó)
+    // due within the current filter (if filtering by label/source, study just that set)
     let pool = visible().filter(n => NN.isDue(n, now));
-    if (!pool.length) pool = NN.live(state.notes).filter(n => NN.isDue(n, now)); // không có trong bộ lọc → học tất cả
-    // đến hạn lâu nhất trước
+    if (!pool.length) pool = NN.live(state.notes).filter(n => NN.isDue(n, now)); // nothing in filter → study everything
+    // longest-overdue first
     pool.sort((a, b) => (a.srs.due || 0) - (b.srs.due || 0));
     return pool;
   }
@@ -686,9 +686,9 @@
     $('#studyDone').hidden = false;
     $('#studyProgress').textContent = '';
     const st = NN.studyStats(state.notes);
-    $('#doneTitle').textContent = nothingDue && !study.done ? 'Không có đoạn nào đến hạn' : 'Xong phần đến hạn!';
-    $('#doneBody').textContent = (study.done ? 'Đã ôn ' + study.done + ' đoạn. ' : '') +
-      'Còn ' + st.studying + ' đoạn trong lịch, ' + st.due + ' đến hạn.';
+    $('#doneTitle').textContent = nothingDue && !study.done ? 'Nothing due right now' : 'All caught up!';
+    $('#doneBody').textContent = (study.done ? 'Reviewed ' + study.done + ' passages. ' : '') +
+      st.studying + ' in the schedule, ' + st.due + ' due.';
   }
 
   function renderStudyCard() {
@@ -704,23 +704,23 @@
 
     $('#studyStage').innerHTML = `
       <div class="study-card" data-color="${esc(n.color || 'amber')}">
-        <div class="st-meta">${esc(NN.hostOf(n.url))} · bậc ${s.box || 0} · đã ôn ${s.reps || 0} lần</div>
+        <div class="st-meta">${esc(NN.hostOf(n.url))} · level ${s.box || 0} · reviewed ${s.reps || 0} times</div>
         <blockquote class="st-quote">${esc(n.text)}</blockquote>
         ${tags ? `<div class="st-tags">${tags}</div>` : ''}
         <div class="st-reveal" hidden>
-          ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— chưa có ghi chú —</p>'}
-          <a class="st-open" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">Mở đoạn gốc ↗</a>
+          ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
+          <a class="st-open" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">Open source passage ↗</a>
         </div>
         <div class="st-actions">
-          <button class="btn ghost" data-st="reveal">Xem ghi chú</button>
+          <button class="btn ghost" data-st="reveal">Show note</button>
           <div class="st-grade" hidden>
-            <button class="btn ghost grade-no" data-st="no">Chưa nhớ</button>
-            <button class="btn grade-yes" data-st="yes">Nhớ</button>
+            <button class="btn ghost grade-no" data-st="no">Not yet</button>
+            <button class="btn grade-yes" data-st="yes">Got it</button>
           </div>
         </div>
         <div class="st-side">
-          <button class="btn link" data-st="hide">Ẩn khỏi học</button>
-          <button class="btn link" data-st="known">Đã thuộc</button>
+          <button class="btn link" data-st="hide">Snooze</button>
+          <button class="btn link" data-st="known">Mastered</button>
         </div>
       </div>`;
   }
@@ -760,13 +760,13 @@
       if (act === 'hide') next.srs.learn = false; else next.srs.known = true;
       next.updatedAt = Date.now();
       NN.putNote(next).then(() => { state.notes[next.id] = next; autoSync(); });
-      toast(act === 'hide' ? 'Đã ẩn khỏi học' : 'Đã đánh dấu đã thuộc');
+      toast(act === 'hide' ? 'Snoozed from study' : 'Marked as mastered');
       advance();
       return;
     }
   });
 
-  // phím tắt khi học: Space=lật, 1/←=Chưa, 2/→/Enter=Nhớ
+  // study shortcuts: Space=flip, 1/←=Not yet, 2/→/Enter=Got it
   document.addEventListener('keydown', e => {
     if ($('#study').hidden) return;
     if (e.key === 'Escape') { closeStudy(); return; }
@@ -784,7 +784,7 @@
   $('#studyClose').addEventListener('click', closeStudy);
   $('#studyFinish').addEventListener('click', closeStudy);
 
-  /* ---------- khởi động ---------- */
+  /* ---------- startup ---------- */
   chrome.storage.onChanged.addListener(ch => {
     if (ch.notes || ch.settings) load();
   });

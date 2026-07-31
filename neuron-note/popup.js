@@ -8,29 +8,29 @@
 
   function fmt(ts) {
     const m = Math.floor((Date.now() - ts) / 60000);
-    if (m < 60) return m + 'p';
+    if (m < 60) return m + 'm';
     const h = Math.floor(m / 60);
-    if (h < 24) return h + 'g';
-    return Math.floor(h / 24) + 'ng';
+    if (h < 24) return h + 'h';
+    return Math.floor(h / 24) + 'd';
   }
 
   function renderLabels(labels) {
     const pick = $('#labelsPick');
     if (!labels.length) {
-      pick.innerHTML = '<span class="none-hint">Chưa có nhãn — tạo trong Thư viện để lưu nhanh theo nhãn.</span>';
+      pick.innerHTML = '<span class="none-hint">No labels yet — create one in the Library to quick-save by label.</span>';
       updateCta();
       return;
     }
     pick.innerHTML =
-      `<button class="lp" data-name="" aria-pressed="${activeLabel === ''}">Không nhãn</button>` +
+      `<button class="lp" data-name="" aria-pressed="${activeLabel === ''}">No label</button>` +
       labels.map(l => `<button class="lp" data-name="${esc(l.name)}" aria-pressed="${activeLabel === l.name}">
         <span class="d ${esc(l.color || 'amber')}"></span>${esc(l.name)}</button>`).join('');
     updateCta();
   }
   function updateCta() {
     $('#saveBtn').textContent = activeLabel
-      ? 'Lưu vào #' + activeLabel
-      : 'Lưu đoạn đang bôi đen';
+      ? 'Save to #' + activeLabel
+      : 'Save selected passage';
   }
 
   $('#labelsPick').addEventListener('click', e => {
@@ -39,7 +39,7 @@
     activeLabel = b.dataset.name || '';
     $('#labelsPick').querySelectorAll('.lp').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     updateCta();
-    NN.saveSettings({ activeLabel });   // nhớ lựa chọn cho lần sau + phím tắt
+    NN.saveSettings({ activeLabel });   // remember the choice for next time + shortcut
   });
 
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
@@ -58,11 +58,11 @@
       const here = all.filter(n => NN.normalizeUrl(n.url) === key);
       const show = here.length ? here : all.slice(0, 6);
 
-      $('#head').textContent = here.length ? 'Trên trang này · ' + here.length
-        : all.length ? 'Mới lưu gần đây' : 'Chưa có đoạn nào';
+      $('#head').textContent = here.length ? 'On this page · ' + here.length
+        : all.length ? 'Recently saved' : 'No passages yet';
       $('#none').hidden = show.length > 0;
       if (!all.length) {
-        $('#none').textContent = 'Chưa lưu đoạn nào. Bôi đen văn bản → chuột phải → Save to Neuron Note, chọn nhãn.';
+        $('#none').textContent = 'No passages saved yet. Select text → right-click → Save to Neuron Note, pick a label.';
       }
       $('#list').innerHTML = show.map(n => `
         <li class="item" data-id="${esc(n.id)}" data-url="${esc(n.fragUrl || n.url)}">
@@ -71,8 +71,8 @@
              <span>${esc(NN.hostOf(n.url))}</span><span>${fmt(n.createdAt)}</span></p>
         </li>`).join('');
 
-      $('#stat').textContent = all.length + ' đoạn' +
-        (settings.lastSync ? ' · đồng bộ ' + fmt(settings.lastSync) + ' trước' : '');
+      $('#stat').textContent = all.length + ' passages' +
+        (settings.lastSync ? ' · synced ' + fmt(settings.lastSync) + ' ago' : '');
     });
   });
 
@@ -82,7 +82,7 @@
     const key = tab && tab.url ? NN.normalizeUrl(tab.url) : '';
     const url = li.dataset.url;
     if (NN.normalizeUrl(url) === key) {
-      // đang ở đúng trang → chỉ cần nháy lên
+      // already on the right page → just flash it
       chrome.tabs.sendMessage(tab.id, { type: 'FLASH', id: li.dataset.id }, () => void chrome.runtime.lastError);
       window.close();
     } else {
@@ -100,16 +100,16 @@
     chrome.runtime.sendMessage({ type: 'OPEN_LIBRARY', hash: '#study' }, () => window.close());
   });
   $('#syncBtn').addEventListener('click', () => {
-    $('#syncBtn').textContent = 'Đang…';
+    $('#syncBtn').textContent = 'Syncing…';
     chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, res => {
       if (res && res.ok) {
-        $('#syncBtn').textContent = 'Xong';
-        $('#stat').textContent = res.total + ' đoạn · vừa đồng bộ';
+        $('#syncBtn').textContent = 'Done';
+        $('#stat').textContent = res.total + ' passages · just synced';
       } else {
-        $('#syncBtn').textContent = 'Lỗi';
-        $('#stat').textContent = (res && res.error) || 'Không kết nối được';
+        $('#syncBtn').textContent = 'Error';
+        $('#stat').textContent = (res && res.error) || 'Could not connect';
       }
-      setTimeout(() => { $('#syncBtn').textContent = 'Đồng bộ'; }, 1800);
+      setTimeout(() => { $('#syncBtn').textContent = 'Sync'; }, 1800);
     });
   });
 })();

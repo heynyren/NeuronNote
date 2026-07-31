@@ -4,9 +4,9 @@ importScripts('shared.js');
 const MENU_SAVE = 'nn-save';
 const MENU_OPEN = 'nn-open';
 const MENU_MANAGE = 'nn-manage';
-const SAVE_PREFIX = 'nn-save::';   // + encodeURIComponent(tên nhãn)
+const SAVE_PREFIX = 'nn-save::';   // + encodeURIComponent(label name)
 
-/* ---------------- menu chuột phải ---------------- */
+/* ---------------- right-click menu ---------------- */
 async function buildMenus() {
   const settings = await NN.getSettings();
   const labels = settings.labels || [];
@@ -14,7 +14,7 @@ async function buildMenus() {
   await new Promise(r => chrome.contextMenus.removeAll(r));
 
   if (!labels.length) {
-    // chưa có nhãn nào → một mục lưu đơn
+    // no labels yet → a single save item
     chrome.contextMenus.create({ id: MENU_SAVE, title: 'Save to Neuron Note', contexts: ['selection'] });
   } else {
     chrome.contextMenus.create({ id: MENU_SAVE, title: 'Save to Neuron Note', contexts: ['selection'] });
@@ -22,23 +22,23 @@ async function buildMenus() {
       chrome.contextMenus.create({
         id: SAVE_PREFIX + encodeURIComponent(l.name),
         parentId: MENU_SAVE,
-        title: '#' + l.name + (settings.activeLabel === l.name ? '  ·  mặc định' : ''),
+        title: '#' + l.name + (settings.activeLabel === l.name ? '  ·  default' : ''),
         contexts: ['selection']
       });
     });
     chrome.contextMenus.create({ id: 'nn-sep1', parentId: MENU_SAVE, type: 'separator', contexts: ['selection'] });
-    chrome.contextMenus.create({ id: SAVE_PREFIX, parentId: MENU_SAVE, title: '(Không nhãn)', contexts: ['selection'] });
+    chrome.contextMenus.create({ id: SAVE_PREFIX, parentId: MENU_SAVE, title: '(No label)', contexts: ['selection'] });
     chrome.contextMenus.create({ id: 'nn-sep2', parentId: MENU_SAVE, type: 'separator', contexts: ['selection'] });
-    chrome.contextMenus.create({ id: MENU_MANAGE, parentId: MENU_SAVE, title: 'Quản lý nhãn…', contexts: ['selection'] });
+    chrome.contextMenus.create({ id: MENU_MANAGE, parentId: MENU_SAVE, title: 'Manage labels…', contexts: ['selection'] });
   }
 
-  chrome.contextMenus.create({ id: MENU_OPEN, title: 'Mở thư viện Neuron Note', contexts: ['action', 'page'] });
+  chrome.contextMenus.create({ id: MENU_OPEN, title: 'Open Neuron Note library', contexts: ['action', 'page'] });
 }
 
 chrome.runtime.onInstalled.addListener(() => { buildMenus(); scheduleSync(); });
 chrome.runtime.onStartup.addListener(() => { buildMenus(); scheduleSync(); });
 
-// dựng lại menu mỗi khi danh sách nhãn / nhãn mặc định đổi
+// rebuild the menu whenever the label list / default label changes
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes.settings) return;
   const a = changes.settings.oldValue || {};
@@ -54,8 +54,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (id === MENU_MANAGE) return openLibrary('#labels');
 
   let label = null;
-  if (id === MENU_SAVE) label = '';                       // mục lưu đơn (chưa có nhãn nào)
-  else if (id === SAVE_PREFIX) label = '';                // (Không nhãn)
+  if (id === MENU_SAVE) label = '';                       // single save item (no labels yet)
+  else if (id === SAVE_PREFIX) label = '';                // (No label)
   else if (typeof id === 'string' && id.indexOf(SAVE_PREFIX) === 0)
     label = decodeURIComponent(id.slice(SAVE_PREFIX.length));
 
@@ -69,7 +69,7 @@ chrome.commands.onCommand.addListener(cmd => {
   chrome.tabs.query({ active: true, currentWindow: true }, async tabs => {
     if (!tabs[0]) return;
     const s = await NN.getSettings();
-    captureAndSave(tabs[0], '', s.activeLabel || '');   // phím tắt dùng nhãn mặc định
+    captureAndSave(tabs[0], '', s.activeLabel || '');   // shortcut uses the default label
   });
 });
 
@@ -77,7 +77,7 @@ function openLibrary(hash) {
   chrome.tabs.create({ url: chrome.runtime.getURL('notes.html' + (hash || '')) });
 }
 
-/* ---------------- lưu đoạn bôi đen ---------------- */
+/* ---------------- save the selected passage ---------------- */
 function askTab(tabId, msg) {
   return new Promise(resolve => {
     chrome.tabs.sendMessage(tabId, msg, res => {
@@ -95,8 +95,8 @@ async function ensureContentScript(tabId) {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
     return true;
   } catch (e) {
-    console.warn('[NeuronNote] không chèn được content script vào tab này:', e && e.message,
-      '— có thể là trang chrome://, cửa hàng tiện ích, PDF hoặc file:// (những trang này Chrome cấm).');
+    console.warn('[NeuronNote] could not inject the content script into this tab:', e && e.message,
+      '— it may be a chrome:// page, the extension store, a PDF or file:// (Chrome blocks these).');
     return false;
   }
 }
@@ -105,24 +105,24 @@ async function flashBadge(tabId, text, color) {
   try {
     chrome.action.setBadgeText({ tabId, text });
     chrome.action.setBadgeBackgroundColor({ tabId, color: color || '#A3352A' });
-  } catch (e) { /* tab đã đóng */ }
+  } catch (e) { /* tab already closed */ }
 }
 
 async function captureAndSave(tab, fallbackText, label) {
   try {
     label = label || '';
-    console.log('[NeuronNote] lưu — tab', tab && tab.id, '| nhãn:', label || '(không)');
+    console.log('[NeuronNote] save — tab', tab && tab.id, '| label:', label || '(none)');
     const ok = await ensureContentScript(tab.id);
-    console.log('[NeuronNote] content script sẵn sàng:', ok);
+    console.log('[NeuronNote] content script ready:', ok);
 
     let cap = ok ? await askTab(tab.id, { type: 'CAPTURE' }) : null;
-    console.log('[NeuronNote] capture:', cap ? (cap.text || '(rỗng)').slice(0, 40) : 'null',
+    console.log('[NeuronNote] capture:', cap ? (cap.text || '(empty)').slice(0, 40) : 'null',
       '| fallback:', (fallbackText || '').slice(0, 40));
 
     if (!cap || !cap.text) {
       if (!fallbackText.trim()) {
-        console.warn('[NeuronNote] không có đoạn nào để lưu.');
-        if (ok) askTab(tab.id, { type: 'TOAST', text: 'Chưa có đoạn nào được bôi đen.' });
+        console.warn('[NeuronNote] nothing to save.');
+        if (ok) askTab(tab.id, { type: 'TOAST', text: 'No text is selected.' });
         flashBadge(tab.id, '!', '#A3352A');
         return;
       }
@@ -150,11 +150,11 @@ async function captureAndSave(tab, fallbackText, label) {
 
     await NN.putNote(note);
     const check = await NN.getNotes();
-    console.log('[NeuronNote] ✔ đã lưu', note.id, '| nhãn:', label || '(không)', '| tổng:', NN.live(check).length);
+    console.log('[NeuronNote] ✔ saved', note.id, '| label:', label || '(none)', '| total:', NN.live(check).length);
 
     refreshBadge(tab.id, note.url);
 
-    // lưu thẳng: chỉ tô highlight + báo nhẹ, KHÔNG mở thẻ ghi chú
+    // direct save: only highlight + a light toast, do NOT open the note card
     const shown = await askTab(tab.id, { type: 'SAVED', note, label });
     if (!shown) {
       flashBadge(tab.id, '✓', '#007D7A');
@@ -163,12 +163,12 @@ async function captureAndSave(tab, fallbackText, label) {
 
     if (settings.autoSync && settings.syncUrl) syncNow().catch(() => {});
   } catch (err) {
-    console.error('[NeuronNote] LỖI khi lưu:', err);
+    console.error('[NeuronNote] ERROR while saving:', err);
     flashBadge(tab && tab.id, '!', '#A3352A');
   }
 }
 
-/* ---------------- huy hiệu số note trên trang ---------------- */
+/* ---------------- badge: note count on the page ---------------- */
 async function refreshBadge(tabId, url) {
   const notes = await NN.getNotes();
   const key = NN.normalizeUrl(url);
@@ -176,7 +176,7 @@ async function refreshBadge(tabId, url) {
   try {
     chrome.action.setBadgeText({ tabId, text: n ? String(n) : '' });
     chrome.action.setBadgeBackgroundColor({ tabId, color: '#007D7A' });
-  } catch (e) { /* tab đã đóng */ }
+  } catch (e) { /* tab already closed */ }
 }
 
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
@@ -188,7 +188,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   });
 });
 
-/* ---------------- thông điệp từ content / trang ---------------- */
+/* ---------------- messages from content / pages ---------------- */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     switch (msg && msg.type) {
@@ -240,10 +240,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: false });
     }
   })();
-  return true; // trả lời bất đồng bộ
+  return true; // respond asynchronously
 });
 
-/* ---------------- đồng bộ qua Apps Script ---------------- */
+/* ---------------- sync via Apps Script ---------------- */
 async function maybeAutoSync() {
   const s = await NN.getSettings();
   if (s.autoSync && s.syncUrl) syncNow().catch(() => {});
@@ -252,22 +252,22 @@ async function maybeAutoSync() {
 let syncing = false;
 async function syncNow() {
   const s = await NN.getSettings();
-  if (!s.syncUrl) return { ok: false, error: 'Chưa cài link Apps Script.' };
-  if (syncing) return { ok: false, error: 'Đang đồng bộ…' };
+  if (!s.syncUrl) return { ok: false, error: 'No Apps Script URL configured.' };
+  if (syncing) return { ok: false, error: 'Already syncing…' };
   syncing = true;
   try {
     const local = await NN.getNotes();
     const res = await fetch(s.syncUrl, {
       method: 'POST',
-      // text/plain để tránh preflight CORS của Apps Script
+      // text/plain to avoid Apps Script's CORS preflight
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'sync', key: s.syncKey || '', notes: local })
     });
     const raw = await res.text();
     let data;
     try { data = JSON.parse(raw); }
-    catch (e) { throw new Error('Máy chủ trả về không phải JSON. Kiểm tra quyền truy cập "Anyone" của Web App.'); }
-    if (!data.ok) throw new Error(data.error || 'Đồng bộ thất bại.');
+    catch (e) { throw new Error('Server did not return JSON. Check that the Web App access is set to "Anyone".'); }
+    if (!data.ok) throw new Error(data.error || 'Sync failed.');
 
     const merged = NN.merge(local, data.notes || {});
     await NN.setNotes(merged.notes);

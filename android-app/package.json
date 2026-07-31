@@ -1,9 +1,10 @@
 {
   "name": "neuron-note-android",
   "version": "1.0.1",
-  "description": "Neuron Note — app Android đồng bộ với extension trên máy tính",
+  "description": "Neuron Note — Android app that syncs with the desktop extension",
   "private": true,
   "scripts": {
+    "test": "node test.js",
     "build:android": "npx cap sync android && node patch-android.js"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^6.1.2"
+    "@capacitor/cli": "^6.1.2",
+    "jsdom": "^30.0.1"
   }
 }

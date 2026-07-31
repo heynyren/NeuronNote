@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,27 +23,27 @@
   </a>
 
   <div class="search">
-    <input type="search" id="q" placeholder="Tìm trong đoạn đã lưu…" autocomplete="off">
+    <input type="search" id="q" placeholder="Search saved passages…" autocomplete="off">
   </div>
 
   <nav class="facets">
     <div class="facet">
       <div class="facet-head">
-        <h2>Nhãn của tôi</h2>
-        <button class="add-label" id="addLabel" title="Thêm nhãn">＋</button>
+        <h2>My labels</h2>
+        <button class="add-label" id="addLabel" title="Add label">＋</button>
       </div>
       <ul id="labelList" class="labels"></ul>
       <div id="tagFilterBar" class="tag-filter" hidden>
         <span id="tagFilterCount" class="tfc"></span>
         <div class="seg">
-          <button data-mode="any" aria-pressed="true">bất kỳ</button>
-          <button data-mode="all" aria-pressed="false">tất cả</button>
+          <button data-mode="any" aria-pressed="true">any</button>
+          <button data-mode="all" aria-pressed="false">all</button>
         </div>
-        <button class="tf-clear" data-clear title="Bỏ lọc">✕</button>
+        <button class="tf-clear" data-clear title="Clear filter">✕</button>
       </div>
     </div>
     <div class="facet">
-      <h2>Nguồn</h2>
+      <h2>Sources</h2>
       <ul id="siteList" class="sites"></ul>
     </div>
   </nav>
@@ -51,11 +51,11 @@
   <div class="rail-foot">
     <div class="sync-line">
       <span class="sync-dot" id="syncDot"></span>
-      <span id="syncText">Chưa bật đồng bộ</span>
+      <span id="syncText">Sync is off</span>
     </div>
     <div class="foot-btns">
-      <button class="btn ghost sm" id="btnSync">Đồng bộ</button>
-      <button class="btn ghost sm" id="btnSettings">Cài đặt</button>
+      <button class="btn ghost sm" id="btnSync">Sync</button>
+      <button class="btn ghost sm" id="btnSettings">Settings</button>
     </div>
   </div>
 </aside>
@@ -63,18 +63,18 @@
 <main class="main">
   <header class="topbar">
     <div>
-      <p class="eyebrow" id="crumb">Tất cả</p>
-      <h1 id="count">0 đoạn</h1>
+      <p class="eyebrow" id="crumb">All</p>
+      <h1 id="count">0 passages</h1>
     </div>
     <div class="topbar-actions">
-      <button class="btn study-btn" id="btnStudy">Học <span class="due-pill" id="duePill" hidden>0</span></button>
-      <select id="sort" aria-label="Sắp xếp">
-        <option value="new">Mới nhất</option>
-        <option value="old">Cũ nhất</option>
-        <option value="site">Theo nguồn</option>
+      <button class="btn study-btn" id="btnStudy">Study <span class="due-pill" id="duePill" hidden>0</span></button>
+      <select id="sort" aria-label="Sort">
+        <option value="new">Newest</option>
+        <option value="old">Oldest</option>
+        <option value="site">By source</option>
       </select>
-      <button class="btn ghost sm" id="btnExport">Xuất</button>
-      <button class="btn ghost sm" id="btnImport">Nhập</button>
+      <button class="btn ghost sm" id="btnExport">Export</button>
+      <button class="btn ghost sm" id="btnImport">Import</button>
       <input type="file" id="fileInput" accept="application/json" hidden>
     </div>
   </header>
@@ -89,74 +89,74 @@
       </g>
       <circle cx="23.5" cy="29.5" r="6.4" fill="currentColor"/>
     </svg>
-    <p class="empty-title">Chưa có đoạn nào ở đây</p>
-    <p class="empty-body">Bôi đen một đoạn bất kỳ trên web, bấm chuột phải rồi chọn
-      <b>Save to Neuron Note</b> — hoặc nhấn <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>.</p>
+    <p class="empty-title">No passages here yet</p>
+    <p class="empty-body">Select any passage on the web, right-click and choose
+      <b>Save to Neuron Note</b> — or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>.</p>
   </div>
 </main>
 
-<!-- Cài đặt -->
+<!-- Settings -->
 <div class="sheet" id="sheet" hidden>
   <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="sheet-head">
-      <h2 id="sheetTitle">Cài đặt</h2>
-      <button class="x" id="sheetClose" aria-label="Đóng">✕</button>
+      <h2 id="sheetTitle">Settings</h2>
+      <button class="x" id="sheetClose" aria-label="Close">✕</button>
     </div>
 
     <div class="sheet-body">
-      <h3>Đồng bộ</h3>
-      <p class="hint">Dán link Web App của Apps Script bạn tự triển khai. Cùng link này dùng lại được cho app Android.</p>
-      <label class="lbl" for="syncUrl">Link Web App</label>
+      <h3>Sync</h3>
+      <p class="hint">Paste the Web App URL of the Apps Script you deployed yourself. The same URL works for the Android app.</p>
+      <label class="lbl" for="syncUrl">Web App URL</label>
       <input type="text" id="syncUrl" placeholder="https://script.google.com/macros/s/…/exec">
-      <label class="lbl" for="syncKey">Mã bí mật <span style="font-weight:400;color:var(--muted)">(tùy chọn — để trống nếu Code.gs để SECRET = '')</span></label>
-      <input type="text" id="syncKey" placeholder="Để trống nếu không đặt mật khẩu">
-      <label class="check"><input type="checkbox" id="autoSync"> Tự đồng bộ sau mỗi thay đổi và mỗi 15 phút</label>
+      <label class="lbl" for="syncKey">Secret <span style="font-weight:400;color:var(--muted)">(optional — leave empty if Code.gs has SECRET = '')</span></label>
+      <input type="text" id="syncKey" placeholder="Leave empty if no password is set">
+      <label class="check"><input type="checkbox" id="autoSync"> Auto-sync after every change and every 15 minutes</label>
 
-      <h3>Nhãn</h3>
-      <p class="hint">Tạo nhãn trước ở đây. Khi bôi đen rồi chuột phải → Save to Neuron Note, chọn nhãn là lưu thẳng, không hiện cửa sổ nào.</p>
+      <h3>Labels</h3>
+      <p class="hint">Create labels here first. Then select text, right-click → Save to Neuron Note, pick a label and it saves instantly, with no popup.</p>
       <div id="labelEditor" class="label-editor"></div>
       <div class="row label-add">
-        <input type="text" id="newLabelName" placeholder="Tên nhãn mới, vd: tiếng-nhật" maxlength="40">
+        <input type="text" id="newLabelName" placeholder="New label name, e.g. japanese" maxlength="40">
         <div class="swatches" id="newLabelColors"></div>
-        <button class="btn sm" id="newLabelAdd">Thêm</button>
+        <button class="btn sm" id="newLabelAdd">Add</button>
       </div>
 
-      <h3>Trên trang web</h3>
-      <label class="check"><input type="checkbox" id="autoHighlight"> Tô lại các đoạn đã lưu khi mở lại trang</label>
-      <label class="lbl" for="markColor">Màu mặc định khi lưu không nhãn</label>
+      <h3>On web pages</h3>
+      <label class="check"><input type="checkbox" id="autoHighlight"> Re-highlight saved passages when reopening a page</label>
+      <label class="lbl" for="markColor">Default color when saving without a label</label>
       <select id="markColor">
-        <option value="amber">Vàng</option>
-        <option value="mint">Bạc hà</option>
-        <option value="sky">Xanh trời</option>
-        <option value="rose">Hồng</option>
-        <option value="lilac">Tím</option>
+        <option value="amber">Amber</option>
+        <option value="mint">Mint</option>
+        <option value="sky">Sky</option>
+        <option value="rose">Rose</option>
+        <option value="lilac">Lilac</option>
       </select>
 
-      <h3>Dữ liệu</h3>
+      <h3>Data</h3>
       <div class="row">
-        <button class="btn ghost sm" id="btnBackup">Sao lưu JSON</button>
-        <button class="btn ghost sm" id="btnMd">Xuất Markdown</button>
-        <button class="btn ghost sm" id="btnCsv">Xuất CSV</button>
+        <button class="btn ghost sm" id="btnBackup">JSON backup</button>
+        <button class="btn ghost sm" id="btnMd">Export Markdown</button>
+        <button class="btn ghost sm" id="btnCsv">Export CSV</button>
       </div>
       <p class="hint" id="stat"></p>
     </div>
 
     <div class="sheet-foot">
-      <button class="btn" id="sheetSave">Lưu cài đặt</button>
+      <button class="btn" id="sheetSave">Save settings</button>
       <span class="sheet-msg" id="sheetMsg"></span>
     </div>
   </div>
 </div>
 
-<!-- Chế độ Học (SRS) -->
+<!-- Study mode (SRS) -->
 <div class="study" id="study" hidden>
   <div class="study-top">
     <div class="study-title">
       <span class="study-dot"></span>
-      <span>Học · lặp lại ngắt quãng</span>
+      <span>Study · spaced repetition</span>
     </div>
     <div class="study-progress" id="studyProgress"></div>
-    <button class="x" id="studyClose" aria-label="Đóng">✕</button>
+    <button class="x" id="studyClose" aria-label="Close">✕</button>
   </div>
 
   <div class="study-stage" id="studyStage"></div>
@@ -167,9 +167,9 @@
         <path d="M20 33 l9 9 l16 -20"/>
       </g>
     </svg>
-    <p class="done-title" id="doneTitle">Hết phần đến hạn hôm nay</p>
+    <p class="done-title" id="doneTitle">All caught up for today</p>
     <p class="done-body" id="doneBody"></p>
-    <button class="btn" id="studyFinish">Xong</button>
+    <button class="btn" id="studyFinish">Done</button>
   </div>
 </div>
 
