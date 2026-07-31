@@ -1,23 +1,30 @@
-# Neuron Note — App Android v1.0.1
+**🌐 English · [Tiếng Việt](README.vi.md)**
 
-Companion cho extension Neuron Note trên máy tính. Cùng định dạng dữ liệu và cùng
-backend Apps Script/Google Drive, nên **đồng bộ thẳng với máy tính**.
+# Neuron Note — Android app v1.0.1
 
-## Làm được gì
+Companion to the Neuron Note desktop extension. Same data format and same Apps
+Script/Google Drive backend, so it **syncs directly with your desktop**.
 
-- **Sổ tay**: xem lại mọi đoạn đã lưu, tìm kiếm, lọc **nhiều nhãn** cùng lúc (bất kỳ/tất cả), mở link gốc.
-- **Học**: ôn theo lặp lại ngắt quãng (1/3/7/14/30/60/120 ngày), tự chấm Nhớ/Chưa nhớ, ẩn khỏi học / đánh dấu đã thuộc.
-- **Thêm**: dán & lưu một đoạn bất kỳ, chọn nhãn.
-- **Lưu từ mọi ứng dụng**: bôi đen chữ ở bất kỳ app nào (trình duyệt, PDF, tin nhắn…) → menu chọn **Neuron Note** → lưu thẳng vào sổ tay dưới nhãn mặc định. Cũng nhận được khi bạn dùng **Chia sẻ → Neuron Note**.
-- **Đồng bộ 2 chiều** với máy tính: bản mới hơn thắng, xoá lan truyền qua "bia mộ".
+## What it does
 
-> Lưu ý: note lưu từ điện thoại (bôi đen ở app khác) thường **không kèm URL**, nên không
-> có nút "Mở đoạn"; nhưng vẫn có text, nhãn và vào lịch học bình thường. Note lưu từ máy
-> tính (có link + highlight) khi mở trên điện thoại sẽ bấm được "Mở" để nhảy tới đúng đoạn.
+- **Notebook**: browse every saved passage, search, filter by **multiple labels** at once
+  (any/all), open the source link.
+- **Study**: review with spaced repetition (1/3/7/14/30/60/120 days), self-rate Got it /
+  Not yet, snooze from study / mark as mastered.
+- **Add**: paste & save any passage, pick a label.
+- **Save from any app**: select text in any app (browser, PDF, messages…) → choose
+  **Neuron Note** from the menu → it's saved straight into the notebook under the default
+  label. Also works via **Share → Neuron Note**.
+- **Two-way sync** with desktop: newer wins, deletions propagate via tombstones.
+
+> Note: notes saved from the phone (selecting text in another app) usually **don't include
+> a URL**, so there's no "Open passage" button; but they still have text, a label, and join
+> the study schedule normally. Notes saved from desktop (with link + highlight) show an
+> "Open" button on the phone to jump to the exact passage.
 
 ## Build (Windows)
 
-Cần: Node.js, Android Studio (kèm JDK). Chạy trong thư mục dự án:
+Needs: Node.js, Android Studio (with JDK). Run in the project folder:
 
 ```bat
 npm install
@@ -30,50 +37,53 @@ set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
 gradlew assembleDebug
 ```
 
-APK nằm ở `android\app\build\outputs\apk\debug\app-debug.apk`. Chép sang điện thoại và cài
-(bật "Cài từ nguồn không xác định").
+The APK is at `android\app\build\outputs\apk\debug\app-debug.apk`. Copy it to your phone
+and install (enable "Install from unknown sources").
 
-**Mỗi lần sửa web (www/):** chạy lại `npx cap sync android` → `node patch-android.js` → `gradlew assembleDebug`.
+**Every time you change the web (www/):** re-run `npx cap sync android` →
+`node patch-android.js` → `gradlew assembleDebug`.
 
-`patch-android.js` tự làm 3 việc trên thư mục `android/` do Capacitor sinh ra: chép
-`MainActivity.java` (nhận ACTION_PROCESS_TEXT + SEND), thêm intent-filter vào
-`AndroidManifest`, đổi tên app thành "Neuron Note". Chạy lại nhiều lần vô hại.
+`patch-android.js` automatically does 3 things to the `android/` folder Capacitor
+generates: copies `MainActivity.java` (to receive ACTION_PROCESS_TEXT + SEND), adds an
+intent-filter to `AndroidManifest`, and renames the app to "Neuron Note". Safe to run
+repeatedly.
 
-## Kết nối đồng bộ
+## Connecting sync
 
-1. Cài xong, mở app → ⚙ **Cài đặt** → dán **đúng link Web App** Apps Script bạn đã dùng cho
-   extension (và mã bí mật nếu có) → bật *Tự đồng bộ* → **Đồng bộ ngay**.
-2. Vì dùng chung file `neuron-note-data.json` trên Drive của bạn, mọi đoạn ở máy tính sẽ
-   hiện trên điện thoại và ngược lại.
+1. After installing, open the app → ⚙ **Settings** → paste the **exact Web App URL** of the
+   Apps Script you already use for the extension (and the secret, if any) → enable
+   *Auto-sync* → **Sync now**.
+2. Because it shares the same `neuron-note-data.json` file on your Drive, every passage on
+   desktop shows up on the phone and vice versa.
 
-## Ghi chú kỹ thuật
+## Technical notes
 
-- `appId` = `com.nhien.neuronnote`. Giữ nguyên id này ở các bản cập nhật sau để cài đè,
-  không mất dữ liệu.
-- Lưu trữ: Capacitor **Preferences** dưới một khoá `nn` = `{ notes, settings }`. `notes`
-  chính là dữ liệu đồng bộ (khớp 100% với extension). `settings` (nhãn, link, nhãn mặc
-  định) là **cục bộ theo máy** — giống extension, chỉ `notes` đi qua đồng bộ; nhưng nhãn
-  dùng trên các đoạn đã đồng bộ vẫn hiện ra để lọc.
-- Đồng bộ dùng `CapacitorHttp` (native, tránh CORS) với `Content-Type: text/plain` để
-  không kích hoạt preflight của Apps Script.
-- Nhận text hệ thống: `MainActivity.java` ghi `{text,ts}` JSON vào SharedPreferences
-  `CapacitorStorage` khoá `incomingText`, bắn sự kiện `nn-incoming-text`; `app.js`
-  `checkIncoming()` đọc + xoá + lưu note (mốc tươi 60 giây), gọi lúc khởi động + resume +
-  sự kiện đó.
+- `appId` = `com.nhien.neuronnote`. Keep this id on future updates so installs overwrite
+  in place without losing data.
+- Storage: Capacitor **Preferences** under a single key `nn` = `{ notes, settings }`.
+  `notes` is the synced data (100% matching the extension). `settings` (labels, URL,
+  default label) is **local per device** — like the extension, only `notes` travels through
+  sync; but labels used on synced passages still appear for filtering.
+- Sync uses `CapacitorHttp` (native, avoids CORS) with `Content-Type: text/plain` so it
+  doesn't trigger Apps Script's preflight.
+- Receiving system text: `MainActivity.java` writes `{text,ts}` JSON into SharedPreferences
+  `CapacitorStorage` key `incomingText`, fires an `nn-incoming-text` event; `app.js`
+  `checkIncoming()` reads + clears + saves the note (60-second freshness window), called on
+  startup + resume + that event.
 
-## Cấu trúc
+## Structure
 
 ```
-neuron-note-android/
-├── capacitor.config.json     appId com.nhien.neuronnote, CapacitorHttp bật
+android-app/
+├── capacitor.config.json     appId com.nhien.neuronnote, CapacitorHttp enabled
 ├── package.json
-├── patch-android.js          vá android/ sau mỗi cap sync
+├── patch-android.js          patches android/ after each cap sync
 ├── android-src/MainActivity.java
-├── assets/                   icon.png + splash.png cho @capacitor/assets
-├── test.js                   test jsdom (chạy: node test.js)
+├── assets/                   icon.png + splash.png for @capacitor/assets
+├── test.js                   jsdom test (run: node test.js)
 └── www/
     ├── index.html
     ├── app.css
-    ├── shared.js             NN.* (logic thuần khớp extension) + lưu Preferences
-    └── app.js                toàn bộ giao diện + đồng bộ + nhận PROCESS_TEXT
+    ├── shared.js             NN.* (pure logic matching the extension) + Preferences storage
+    └── app.js                the entire UI + sync + PROCESS_TEXT handling
 ```

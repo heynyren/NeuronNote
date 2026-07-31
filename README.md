@@ -1,12 +1,14 @@
 <div align="center">
 
+**🌐 English · [Tiếng Việt](README.vi.md)**
+
 # 🧠 Neuron Note
 
-**Lưu lại điều đáng nhớ trên web — ôn lại đúng lúc sắp quên.**
+**Highlight the web. Remember what matters.**
 
-Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đúng vị trí →
-ôn lại theo **lặp lại ngắt quãng** (spaced repetition). Đồng bộ giữa máy tính và
-điện thoại qua Google Drive.
+Select any passage on a page → save it under a label, with a link that jumps you
+straight back to the exact spot → review it right before you'd forget, with
+**spaced repetition**. Syncs between desktop and phone through your own Google Drive.
 
 ![Version](https://img.shields.io/badge/extension-v1.3.0-6c5ce7)
 ![Android](https://img.shields.io/badge/android-v1.0.1-2ecc71)
@@ -17,55 +19,62 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 
 ---
 
-## Neuron Note là gì?
+## What is Neuron Note?
 
-Đọc trên web ta gặp rất nhiều thứ hay nhưng rồi quên sạch. Neuron Note biến việc
-"bôi đen để nhớ" thành một quy trình học thật sự:
+We read great things on the web and forget almost all of them. Neuron Note turns
+"highlighting to remember" into a real learning loop:
 
-1. **Lưu nhanh** — bôi đen đoạn văn → chuột phải → chọn nhãn → xong. Đoạn được tô màu
-   ngay trên trang, kèm một *text-fragment link* đưa bạn quay lại đúng chỗ.
-2. **Ôn đúng lúc** — mọi đoạn tự vào lịch ôn. Nhớ thì giãn dần `1 → 3 → 7 → 14 → 30 → 60 → 120`
-   ngày; chưa nhớ thì gặp lại sau 1 ngày.
-3. **Mọi nơi** — cùng dữ liệu trên **Chrome/Edge** và **Android**, đồng bộ 2 chiều
-   qua Google Drive (backend Apps Script của chính bạn — không có máy chủ bên thứ ba).
+1. **Save in one move** — select text → right-click → pick a label → done. The passage
+   is highlighted right on the page, with a *text-fragment link* that takes you back to
+   the exact spot.
+2. **Review at the right time** — every passage enters a review schedule automatically.
+   Remembered? The interval grows `1 → 3 → 7 → 14 → 30 → 60 → 120` days. Forgot? You see
+   it again after 1 day.
+3. **Everywhere** — the same data on **Chrome/Edge** and **Android**, synced both ways
+   through Google Drive (your *own* Apps Script backend — no third-party server).
 
-## Có gì trong repo này
+## What's in this repo
 
-| Thư mục | Nội dung |
+| Folder | Contents |
 |---|---|
-| [`neuron-note/`](neuron-note/) | **Extension Chrome/Edge** (Manifest V3) — bản chính. Xem [README](neuron-note/README.md). |
-| [`android-app/`](android-app/) | **App Android** (Capacitor) — companion, dùng chung backend. Xem [README](android-app/README.md). |
+| [`neuron-note/`](neuron-note/) | **Chrome/Edge extension** (Manifest V3) — the main app. See its [README](neuron-note/README.md). |
+| [`android-app/`](android-app/) | **Android app** (Capacitor) — companion, shares the same backend. See its [README](android-app/README.md). |
 
-## Tính năng nổi bật
+## Highlights
 
-- 🏷️ **Nhãn kiểu Google Keep** — một đoạn mang nhiều nhãn, lọc AND/OR.
-- 🔁 **Chế độ Học** — spaced repetition, phím tắt, ẩn khỏi học / đánh dấu đã thuộc.
-- 🔗 **Neo lại chính xác** — dùng chuẩn *text fragment* của trình duyệt, người khác
-  không cài extension mở link vẫn nhảy đúng chỗ.
-- ∑ **Hiểu công thức toán** — nhận diện KaTeX/MathJax (ví dụ nội dung Gemini xuất ra).
-- ☁️ **Đồng bộ Google Drive** — trộn theo "bản mới hơn thắng", xoá lan truyền qua bia mộ.
-- 📧 **Email nhắc ôn mỗi sáng** — qua Apps Script.
-- 📤 **Xuất/nhập** — Markdown, JSON, CSV.
+- 🏷️ **Google-Keep-style labels** — one passage can carry many labels; filter by AND/OR.
+- 🔁 **Study mode** — spaced repetition, keyboard shortcuts, snooze / mark-as-mastered.
+- 🔗 **Precise re-anchoring** — uses the browser's native *text fragment* standard, so a
+  link jumps to the right place even for people who don't have the extension.
+- ∑ **Understands math** — recognizes KaTeX/MathJax formulas (e.g. content from Gemini).
+- ☁️ **Google Drive sync** — merges with "newest wins", deletions propagate via tombstones.
+- 📧 **Morning review email** — via Apps Script.
+- 📤 **Export / import** — Markdown, JSON, CSV.
 
-## Bắt đầu nhanh
+## Quick start
 
 **Extension (Chrome/Edge):**
 ```
-1. chrome://extensions → bật Developer mode
-2. Load unpacked → chọn thư mục neuron-note/
+1. Go to chrome://extensions → enable Developer mode
+2. Load unpacked → select the neuron-note/ folder
 ```
-Chi tiết + cách bật đồng bộ: [neuron-note/README.md](neuron-note/README.md).
+Full setup, including sync: [neuron-note/README.md](neuron-note/README.md).
 
-**App Android:** cần Node.js + Android Studio, xem
-[hướng dẫn build](android-app/README.md).
+**Android app:** needs Node.js + Android Studio — see the
+[build guide](android-app/README.md).
 
-## Riêng tư & dữ liệu
+## Privacy & data
 
-Neuron Note **không có máy chủ riêng**. Toàn bộ dữ liệu nằm trong trình duyệt/điện thoại
-của bạn (`chrome.storage.local` / Capacitor Preferences) và — nếu bạn bật đồng bộ — trong
-file `neuron-note-data.json` trên **Google Drive của chính bạn**, qua một Apps Script do
-bạn tự tạo. Không ai khác chạm được dữ liệu đó.
+Neuron Note has **no server of its own**. All your data lives in your browser/phone
+(`chrome.storage.local` / Capacitor Preferences) and — if you turn on sync — in a
+`neuron-note-data.json` file on **your own Google Drive**, through an Apps Script *you*
+create. Nobody else can reach it. See [PRIVACY.md](PRIVACY.md).
 
-## Giấy phép
+## Support the project 💝
 
-Phát hành theo giấy phép [MIT](LICENSE).
+Neuron Note is free and open source. If it helps you remember more of what you read,
+consider supporting development — see the **Sponsor** button at the top of the repo.
+
+## License
+
+Released under the [MIT](LICENSE) license.

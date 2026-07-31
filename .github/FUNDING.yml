@@ -1,0 +1,16 @@
+# Bật nút "Sponsor" trên trang GitHub của repo.
+# https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# GitHub Sponsors — nút hiện SAU KHI bạn đăng ký GitHub Sponsors:
+# https://github.com/sponsors  (Join the waitlist / Set up Sponsors)
+github: [heynyren]
+
+# --- Khi có tài khoản, bỏ dấu # ở dòng tương ứng và điền tên của bạn ---
+
+# Ko-fi (khuyến nghị cho quốc tế, nhận qua PayPal/thẻ):
+# https://ko-fi.com  → tạo tài khoản, lấy tên trang
+# ko_fi: ten-trang-ko-fi-cua-ban
+
+# Buy Me a Coffee:
+# https://www.buymeacoffee.com
+# custom: ["https://www.buymeacoffee.com/ten-cua-ban"]
