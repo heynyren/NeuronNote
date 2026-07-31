@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Neuron Note</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="top">
+    <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round">
+        <path d="M22 25 L11.5 13.5"/><path d="M18 30 L6 27.5"/><path d="M27 22 L25.5 9.5"/>
+        <path d="M28.5 33.5 C36 41 35 49 43.5 51 C50 52.5 54.5 49.5 54 44.5"/>
+      </g>
+      <circle cx="23.5" cy="29.5" r="6.4" fill="currentColor"/>
+      <circle cx="54" cy="44.5" r="3.4" fill="#007D7A"/>
+    </svg>
+    <span class="wordmark">Neuron<em>Note</em></span>
+    <button class="x" id="openLib" title="Mở thư viện">Thư viện</button>
+  </header>
+
+  <div class="labels-pick" id="labelsPick"></div>
+  <button class="cta" id="saveBtn">Lưu đoạn đang bôi đen</button>
+  <button class="cta study" id="studyBtn" hidden>Ôn hôm nay · <span id="dueN">0</span> đến hạn</button>
+
+  <p class="eyebrow" id="head">Trên trang này</p>
+  <ul class="list" id="list"></ul>
+  <p class="none" id="none" hidden>Chưa có đoạn nào lưu từ trang này.</p>
+
+  <footer class="foot">
+    <button class="mini" id="syncBtn">Đồng bộ</button>
+    <span class="stat" id="stat"></span>
+  </footer>
+
+<script src="shared.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

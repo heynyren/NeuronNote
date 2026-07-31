@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuron Note</title>
+<link rel="icon" href="../icons/icon48.png">
+<link rel="stylesheet" href="nn.css">
+<style>
+  .wrap { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 28px; max-width: 1080px; margin: 0 auto; padding: 26px 24px 80px; }
+
+  /* ---- cột trái ---- */
+  aside { position: sticky; top: 26px; align-self: start; max-height: calc(100vh - 52px); overflow-y: auto; padding-right: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .brand img { width: 34px; height: 34px; border-radius: 9px; }
+  .brand h1 { font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+  .brand .n { font-family: var(--mono); font-size: 10.5px; color: var(--muted); display: block; margin-top: 1px; letter-spacing: .04em; }
+
+  .block { margin-bottom: 22px; }
+  .block > .eyebrow { display: block; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chips .tag .c { color: var(--muted); font-size: 9.5px; }
+  .tag.on .c { color: #A7A2B4; }
+
+  .field { margin-bottom: 9px; }
+  .field label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); padding: 4px 0; cursor: pointer; }
+  .toggle input { width: auto; accent-color: var(--spark); }
+
+  .stack { display: flex; flex-wrap: wrap; gap: 6px; }
+  .synced { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 7px; }
+  .synced.err { color: var(--spark); }
+
+  /* ---- cột phải ---- */
+  .head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .head h2 { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+  .head .spacer { flex: 1; }
+  .head select { width: auto; font-size: 12px; padding: 5px 8px; }
+
+  .edit { margin-top: 11px; padding-top: 11px; border-top: 1px dashed var(--line); }
+  .edit label { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 4px; }
+  .edit .row { display: flex; gap: 6px; margin-top: 10px; }
+
+  @media (max-width: 800px) {
+    .wrap { grid-template-columns: 1fr; gap: 20px; padding: 18px 16px 60px; }
+    aside { position: static; max-height: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <aside>
+    <div class="brand">
+      <img src="../icons/icon128.png" alt="">
+      <div>
+        <h1>Neuron Note</h1>
+        <span class="n" id="stat">…</span>
+      </div>
+    </div>
+
+    <div class="block">
+      <input type="search" id="q" placeholder="Tìm…">
+    </div>
+
+    <div class="block">
+      <span class="eyebrow">Nhãn</span>
+      <div class="chips" id="tags"></div>
+    </div>
+
+    <div class="block">
+      <span class="eyebrow">Nguồn</span>
+      <select id="site"><option value="">Tất cả trang</option></select>
+    </div>
+
+    <div class="block">
+      <span class="eyebrow">Đồng bộ Google Drive</span>
+      <div class="field">
+        <label for="surl">Địa chỉ Apps Script Web App</label>
+        <input type="url" id="surl" placeholder="https://script.google.com/macros/s/…/exec">
+      </div>
+      <div class="stack">
+        <button id="saveUrl">Lưu địa chỉ</button>
+        <button id="syncNow" class="primary">Đồng bộ ngay</button>
+      </div>
+      <div class="synced" id="syncInfo"></div>
+    </div>
+
+    <div class="block">
+      <span class="eyebrow">Cách hoạt động</span>
+      <label class="toggle"><input type="checkbox" id="opt-autoHighlight"> Tô lại vết bôi khi mở trang</label>
+      <label class="toggle"><input type="checkbox" id="opt-flashOnOpen"> Nháy sáng khi mở link ghi chú</label>
+      <label class="toggle"><input type="checkbox" id="opt-askNote"> Hỏi nhãn &amp; ghi chú ngay sau khi lưu</label>
+      <label class="toggle"><input type="checkbox" id="opt-autoSync"> Tự đẩy lên Drive sau khi sửa</label>
+    </div>
+
+    <div class="block">
+      <span class="eyebrow">Sao lưu</span>
+      <div class="stack">
+        <button id="exJson">JSON</button>
+        <button id="exMd">Markdown</button>
+        <button id="exCsv">CSV</button>
+        <button id="imp">Nhập JSON</button>
+      </div>
+      <input type="file" id="file" accept="application/json,.json" hidden>
+    </div>
+  </aside>
+
+  <main>
+    <div class="head">
+      <h2 id="title">Tất cả ghi chú</h2>
+      <span class="spacer"></span>
+      <select id="sort">
+        <option value="new">Mới nhất trước</option>
+        <option value="old">Cũ nhất trước</option>
+        <option value="site">Theo trang</option>
+      </select>
+    </div>
+    <div id="list"></div>
+  </main>
+</div>
+
+<div id="toast"></div>
+<script src="../lib/store.js"></script>
+<script src="notes.js"></script>
+</body>
+</html>

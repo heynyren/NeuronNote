@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuron Note</title>
+<link rel="icon" href="icons/icon32.png">
+<link rel="stylesheet" href="notes.css">
+</head>
+<body>
+
+<aside class="rail-left">
+  <a class="brand" href="#" id="brandHome">
+    <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round">
+        <path d="M22 25 L11.5 13.5"/><path d="M18 30 L6 27.5"/><path d="M27 22 L25.5 9.5"/>
+        <path d="M28.5 33.5 C36 41 35 49 43.5 51 C50 52.5 54.5 49.5 54 44.5"/>
+      </g>
+      <circle cx="23.5" cy="29.5" r="6.4" fill="currentColor"/>
+      <circle cx="54" cy="44.5" r="3.4" fill="#007D7A"/>
+    </svg>
+    <span class="wordmark">Neuron<em>Note</em></span>
+  </a>
+
+  <div class="search">
+    <input type="search" id="q" placeholder="Tìm trong đoạn đã lưu…" autocomplete="off">
+  </div>
+
+  <nav class="facets">
+    <div class="facet">
+      <div class="facet-head">
+        <h2>Nhãn của tôi</h2>
+        <button class="add-label" id="addLabel" title="Thêm nhãn">＋</button>
+      </div>
+      <ul id="labelList" class="labels"></ul>
+      <div id="tagFilterBar" class="tag-filter" hidden>
+        <span id="tagFilterCount" class="tfc"></span>
+        <div class="seg">
+          <button data-mode="any" aria-pressed="true">bất kỳ</button>
+          <button data-mode="all" aria-pressed="false">tất cả</button>
+        </div>
+        <button class="tf-clear" data-clear title="Bỏ lọc">✕</button>
+      </div>
+    </div>
+    <div class="facet">
+      <h2>Nguồn</h2>
+      <ul id="siteList" class="sites"></ul>
+    </div>
+  </nav>
+
+  <div class="rail-foot">
+    <div class="sync-line">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncText">Chưa bật đồng bộ</span>
+    </div>
+    <div class="foot-btns">
+      <button class="btn ghost sm" id="btnSync">Đồng bộ</button>
+      <button class="btn ghost sm" id="btnSettings">Cài đặt</button>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow" id="crumb">Tất cả</p>
+      <h1 id="count">0 đoạn</h1>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn study-btn" id="btnStudy">Học <span class="due-pill" id="duePill" hidden>0</span></button>
+      <select id="sort" aria-label="Sắp xếp">
+        <option value="new">Mới nhất</option>
+        <option value="old">Cũ nhất</option>
+        <option value="site">Theo nguồn</option>
+      </select>
+      <button class="btn ghost sm" id="btnExport">Xuất</button>
+      <button class="btn ghost sm" id="btnImport">Nhập</button>
+      <input type="file" id="fileInput" accept="application/json" hidden>
+    </div>
+  </header>
+
+  <section id="list" class="list"></section>
+
+  <div id="empty" class="empty" hidden>
+    <svg viewBox="0 0 64 64" class="empty-glyph" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <path d="M22 25 L11.5 13.5"/><path d="M18 30 L6 27.5"/><path d="M27 22 L25.5 9.5"/>
+        <path d="M28.5 33.5 C36 41 35 49 43.5 51 C50 52.5 54.5 49.5 54 44.5"/>
+      </g>
+      <circle cx="23.5" cy="29.5" r="6.4" fill="currentColor"/>
+    </svg>
+    <p class="empty-title">Chưa có đoạn nào ở đây</p>
+    <p class="empty-body">Bôi đen một đoạn bất kỳ trên web, bấm chuột phải rồi chọn
+      <b>Save to Neuron Note</b> — hoặc nhấn <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>.</p>
+  </div>
+</main>
+
+<!-- Cài đặt -->
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Cài đặt</h2>
+      <button class="x" id="sheetClose" aria-label="Đóng">✕</button>
+    </div>
+
+    <div class="sheet-body">
+      <h3>Đồng bộ</h3>
+      <p class="hint">Dán link Web App của Apps Script bạn tự triển khai. Cùng link này dùng lại được cho app Android.</p>
+      <label class="lbl" for="syncUrl">Link Web App</label>
+      <input type="text" id="syncUrl" placeholder="https://script.google.com/macros/s/…/exec">
+      <label class="lbl" for="syncKey">Mã bí mật <span style="font-weight:400;color:var(--muted)">(tùy chọn — để trống nếu Code.gs để SECRET = '')</span></label>
+      <input type="text" id="syncKey" placeholder="Để trống nếu không đặt mật khẩu">
+      <label class="check"><input type="checkbox" id="autoSync"> Tự đồng bộ sau mỗi thay đổi và mỗi 15 phút</label>
+
+      <h3>Nhãn</h3>
+      <p class="hint">Tạo nhãn trước ở đây. Khi bôi đen rồi chuột phải → Save to Neuron Note, chọn nhãn là lưu thẳng, không hiện cửa sổ nào.</p>
+      <div id="labelEditor" class="label-editor"></div>
+      <div class="row label-add">
+        <input type="text" id="newLabelName" placeholder="Tên nhãn mới, vd: tiếng-nhật" maxlength="40">
+        <div class="swatches" id="newLabelColors"></div>
+        <button class="btn sm" id="newLabelAdd">Thêm</button>
+      </div>
+
+      <h3>Trên trang web</h3>
+      <label class="check"><input type="checkbox" id="autoHighlight"> Tô lại các đoạn đã lưu khi mở lại trang</label>
+      <label class="lbl" for="markColor">Màu mặc định khi lưu không nhãn</label>
+      <select id="markColor">
+        <option value="amber">Vàng</option>
+        <option value="mint">Bạc hà</option>
+        <option value="sky">Xanh trời</option>
+        <option value="rose">Hồng</option>
+        <option value="lilac">Tím</option>
+      </select>
+
+      <h3>Dữ liệu</h3>
+      <div class="row">
+        <button class="btn ghost sm" id="btnBackup">Sao lưu JSON</button>
+        <button class="btn ghost sm" id="btnMd">Xuất Markdown</button>
+        <button class="btn ghost sm" id="btnCsv">Xuất CSV</button>
+      </div>
+      <p class="hint" id="stat"></p>
+    </div>
+
+    <div class="sheet-foot">
+      <button class="btn" id="sheetSave">Lưu cài đặt</button>
+      <span class="sheet-msg" id="sheetMsg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Chế độ Học (SRS) -->
+<div class="study" id="study" hidden>
+  <div class="study-top">
+    <div class="study-title">
+      <span class="study-dot"></span>
+      <span>Học · lặp lại ngắt quãng</span>
+    </div>
+    <div class="study-progress" id="studyProgress"></div>
+    <button class="x" id="studyClose" aria-label="Đóng">✕</button>
+  </div>
+
+  <div class="study-stage" id="studyStage"></div>
+
+  <div class="study-done" id="studyDone" hidden>
+    <svg viewBox="0 0 64 64" class="done-glyph" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+        <path d="M20 33 l9 9 l16 -20"/>
+      </g>
+    </svg>
+    <p class="done-title" id="doneTitle">Hết phần đến hạn hôm nay</p>
+    <p class="done-body" id="doneBody"></p>
+    <button class="btn" id="studyFinish">Xong</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="shared.js"></script>
+<script src="notes.js"></script>
+</body>
+</html>

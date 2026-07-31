@@ -1,0 +1,22 @@
+# Chuẩn hóa xuống dòng: trong repo luôn là LF, khi checkout tự đổi theo hệ điều hành.
+* text=auto eol=lf
+
+# Script Windows giữ CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Gradle wrapper của Unix giữ LF
+gradlew text eol=lf
+
+# File nhị phân — không đụng vào
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.zip binary
+*.jar binary
+*.keystore binary
+*.apk binary
+*.aab binary

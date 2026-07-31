@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Neuron Note",
+  "version": "1.3.0",
+  "description": "Bôi đen văn bản → chọn nhãn → lưu thẳng, kèm link quay lại đúng vị trí. Đồng bộ qua Google Drive.",
+  "permissions": ["contextMenus", "storage", "scripting", "activeTab", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Neuron Note",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "save-selection": {
+      "suggested_key": { "default": "Alt+Shift+N" },
+      "description": "Lưu đoạn đang bôi đen vào Neuron Note"
+    }
+  },
+  "options_page": "notes.html"
+}

@@ -1,0 +1,35 @@
+/* Neuron Note — highlight hiển thị ngay trên trang gốc */
+mark.nn-hl {
+  color: inherit !important;
+  padding: 0 .05em;
+  margin: 0 -.05em;
+  border-radius: 2px;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  background-color: #FFE59E;
+  box-shadow: inset 0 -0.08em 0 rgba(0, 0, 0, .12);
+  transition: background-color .18s ease;
+}
+mark.nn-hl[data-nncolor="amber"] { background-color: #FFE59E; }
+mark.nn-hl[data-nncolor="mint"]  { background-color: #B7EBD8; }
+mark.nn-hl[data-nncolor="sky"]   { background-color: #BFDDFA; }
+mark.nn-hl[data-nncolor="rose"]  { background-color: #FBC9D2; }
+mark.nn-hl[data-nncolor="lilac"] { background-color: #DCD1FA; }
+
+mark.nn-hl[data-nnnote="1"] {
+  border-bottom: 2px solid rgba(0, 125, 122, .75);
+}
+mark.nn-hl:hover { filter: brightness(.95); }
+
+mark.nn-hl.nn-flash {
+  animation: nn-pulse 1.1s ease-out 3;
+}
+@keyframes nn-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 125, 122, .55); }
+  70%  { box-shadow: 0 0 0 12px rgba(0, 125, 122, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 125, 122, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  mark.nn-hl.nn-flash { animation: none; outline: 2px solid #007D7A; outline-offset: 2px; }
+}
