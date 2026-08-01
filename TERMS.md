@@ -2,11 +2,12 @@
 
 _Last updated: 2026-07-31_
 
-Neuron Note is free, open-source software provided under the [MIT License](LICENSE).
+Neuron Note is free, open-source software provided under the
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
 By installing or using it, you agree to the following:
 
 1. **As-is.** The Software is provided "as is", without warranty of any kind. See the
-   [MIT License](LICENSE) for the full disclaimer. You use it at your own risk.
+   [AGPL-3.0 License](LICENSE) for the full disclaimer. You use it at your own risk.
 
 2. **Your data is yours.** You are responsible for the content you save and for any Google
    account, Apps Script, and Google Drive storage you connect for sync. The developer does
