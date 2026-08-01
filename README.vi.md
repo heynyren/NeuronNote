@@ -12,7 +12,7 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 
 ![Version](https://img.shields.io/badge/extension-v1.3.0-6c5ce7)
 ![Android](https://img.shields.io/badge/android-v1.0.1-2ecc71)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20%7C%20Android-lightgrey)
 
 </div>
@@ -68,6 +68,25 @@ của bạn (`chrome.storage.local` / Capacitor Preferences) và — nếu bạn
 file `neuron-note-data.json` trên **Google Drive của chính bạn**, qua một Apps Script do
 bạn tự tạo. Không ai khác chạm được dữ liệu đó.
 
+## Tác giả
+
+Được tạo và phát triển bởi **Nyren Pham** — https://github.com/heynyren/NeuronNote
+
+Đây là sản phẩm gốc của mình. Nếu thấy hữu ích, một ⭐ cho repo là mình vui rồi.
+
+## Tên & logo (thương hiệu)
+
+**Mã nguồn** mở theo AGPL-3.0, nhưng **tên "Neuron Note"** và **logo/icon** là
+nhãn hiệu của tác giả, **không** nằm trong giấy phép mã nguồn. Bạn được dùng và
+fork code thoải mái — nhưng hãy đặt cho bản của bạn **tên và thương hiệu riêng**,
+đừng trình bày như thể đó là "Neuron Note" chính thức. Xem [NOTICE](NOTICE).
+
 ## Giấy phép
 
-Phát hành theo giấy phép [MIT](LICENSE).
+Phát hành theo **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0).
+
+Nói ngắn gọn: ai cũng được dùng, học hỏi, chia sẻ và chỉnh sửa tự do — nhưng nếu
+phân phối lại, **hoặc chạy bản đã sửa dưới dạng dịch vụ mạng**, thì **bắt buộc
+phải mở mã nguồn của họ theo cùng giấy phép** và **ghi công tác giả gốc**. Điều này
+giữ Neuron Note luôn mở cho mọi người và **ngăn bị biến thành phần mềm đóng**. Chi
+tiết về tác giả và thương hiệu xem [NOTICE](NOTICE).
