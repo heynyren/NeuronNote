@@ -5,19 +5,18 @@ title Neuron Note - Cap nhat extension
 
 REM ============================================================
 REM  Neuron Note - Tu dong cap nhat extension tu GitHub.
+REM  Dat file nay o THU MUC GOC repo (vd: F:\setupfiles\NeuronNote).
 REM
-REM  Dat file nay o THU MUC GOC cua repo (vd: F:\setupfiles\NeuronNote).
-REM  Script keo code moi nhat ve NGAY tai cho (git pull), nen thu muc
-REM  extension "neuron-note" giu nguyen duong dan -> extension giu
-REM  nguyen ID va toan bo ghi chu da luu KHONG bi mat.
-REM  Sau do ban chi can bam Reload trong edge://extensions
-REM  (hoac chrome://extensions).
+REM  Cach hoat dong: ep thu muc local KHOP CHINH XAC voi ban tren
+REM  GitHub (git reset --hard). => Khong xung dot, khong hoi (y/n).
+REM  LUU Y: moi thay doi code cuc bo trong thu muc se bi ghi de.
+REM  File nay dung de "chi cap nhat", dung sua code truc tiep o day.
 REM
-REM  Yeu cau: da cai Git for Windows va thu muc nay la ban sao
-REM  (git clone) cua repo NeuronNote.
+REM  Thu muc "neuron-note" giu nguyen duong dan -> extension giu
+REM  nguyen ID va ghi chu da luu KHONG mat. Xong nho bam Reload.
 REM ============================================================
 
-REM (Tuy chon) Ten nhanh muon cap nhat. De trong = nhanh hien tai.
+REM (Tuy chon) Ten nhanh muon theo. De trong = nhanh hien tai.
 set "BRANCH="
 
 cd /d "%~dp0"
@@ -25,9 +24,7 @@ cd /d "%~dp0"
 where git >nul 2>nul
 if errorlevel 1 (
   echo.
-  echo [LOI] Chua cai Git hoac Git khong co trong PATH.
-  echo Tai Git for Windows tai: https://git-scm.com/download/win
-  echo Cai xong, mo lai file nay.
+  echo [LOI] Chua cai Git. Tai tai: https://git-scm.com/download/win
   echo.
   pause
   exit /b 1
@@ -36,43 +33,40 @@ if errorlevel 1 (
 git rev-parse --is-inside-work-tree >nul 2>nul
 if errorlevel 1 (
   echo.
-  echo [LOI] Thu muc nay khong phai ban sao git cua repo NeuronNote.
-  echo Hay dung "git clone" de tai repo ve ^(dung tai file .zip^), roi thu lai.
+  echo [LOI] Thu muc nay khong phai ban sao git ^(git clone^) cua repo.
   echo.
   pause
   exit /b 1
 )
 
+if not defined BRANCH (
+  for /f "delims=" %%b in ('git rev-parse --abbrev-ref HEAD') do set "BRANCH=%%b"
+)
+
 echo.
-echo === Neuron Note: dang cap nhat... ===
+echo === Neuron Note: dang cap nhat nhanh "!BRANCH!"... ===
 echo.
 
-git fetch --all --prune
+git fetch origin "!BRANCH!" --prune
 if errorlevel 1 goto fail
 
-if defined BRANCH (
-  git checkout "%BRANCH%" || goto fail
-)
+REM Ep khop chinh xac voi ban tren GitHub (khong hoi, khong ket).
+git reset --hard "origin/!BRANCH!"
+if errorlevel 1 goto fail
 
-git pull --ff-only
-if errorlevel 1 (
-  echo.
-  echo [Chu y] Khong the fast-forward ^(co the ban dang co thay doi cuc bo^).
-  echo Dang tam cat thay doi ^(git stash^) va thu lai...
-  git stash push -u -m "neuron-note-auto-update" >nul 2>nul
-  git pull --ff-only
-  if errorlevel 1 goto fail
-)
+REM Don file rac untracked (giu lai chinh update.bat neu ban tu tao tay truoc do).
+git clean -fd -e update.bat >nul 2>nul
 
 set "REV="
 for /f "delims=" %%v in ('git rev-parse --short HEAD') do set "REV=%%v"
 
 echo.
 echo ============================================================
-echo  ^>^> Cap nhat xong.  Phien ban: !REV!
+echo  ^>^> Cap nhat xong.  ^(commit !REV!^)
 echo.
 echo  Buoc cuoi: mo   edge://extensions   ^(hoac chrome://extensions^)
-echo  tim "Neuron Note" roi bam bieu tuong Reload ^(vong tron mui ten^).
+echo  tim "Neuron Note" roi bam Reload ^(vong tron mui ten^)
+echo  va kiem tra so phien ban.
 echo ============================================================
 echo.
 pause
@@ -80,8 +74,9 @@ exit /b 0
 
 :fail
 echo.
-echo [LOI] Cap nhat that bai. Xem thong bao loi ben tren.
-echo Neu bi ket, mo Git Bash tai thu muc nay va chay:  git status
+echo [LOI] Cap nhat that bai. Thuong do 1 file/thu muc dang bi khoa.
+echo   - Dong File Explorer / VS Code dang mo thu muc nay.
+echo   - Roi chay lai file update.bat nay.
 echo.
 pause
 exit /b 1
