@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Neuron Note",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Select text → pick a label → save instantly, with a link back to the exact spot. Syncs via Google Drive.",
   "author": "Nyren Pham",
   "homepage_url": "https://github.com/heynyren/NeuronNote",

@@ -5,7 +5,11 @@
   window.__NEURON_NOTE_READY__ = true;
 
   const UI_ID = 'neuron-note-ui';
-  const squash = s => String(s || '').replace(/\s+/g, ' ').trim();
+  // Collapse every Unicode whitespace run — including the ideographic space (U+3000,
+  // common in Japanese text) and the zero-width space (U+200B) — to one plain space,
+  // so saved text and the page index normalize identically. Keep this in sync with
+  // makeIndex()'s whitespace test and NN.squash() in shared.js.
+  const squash = s => String(s || '').replace(/[\s\u200b]+/g, ' ').trim();
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -75,7 +79,8 @@
       const s = n.nodeValue;
       for (let k = 0; k < s.length; k++) {
         const ch = s[k];
-        if (ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r' || ch === '\u00a0' || ch === '\u200b') {
+        // Same whitespace class as squash(): any Unicode space (incl. U+3000) + U+200B.
+        if (/[\s\u200b]/.test(ch)) {
           needSpace = true;
           if (!spaceSrc) spaceSrc = { node: n, off: k };
           continue;
@@ -702,9 +707,19 @@
       case 'SAVED': {
         const note = msg.note;
         PAGE_NOTES.push(note);
-        paint(note);
+        // Clear the selection BEFORE painting: splitText/insertBefore on text
+        // nodes that are still inside the live selection can fail, so no <mark>
+        // gets inserted (the highlight only appears after a reload). Painting
+        // with no active selection matches the working restore-on-reload path.
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
+        if (!paint(note)) {
+          // dynamic page: the target text node may not be ready yet — retry a few times
+          let tries = 0;
+          const t = setInterval(() => {
+            if (paint(note) || ++tries >= 5) clearInterval(t);
+          }, 400);
+        }
         const label = msg.label ? ' · #' + msg.label : '';
         // direct save, no card; just a light toast with Undo / Note shortcuts
         savedToast('Saved' + label, note);

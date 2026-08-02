@@ -10,7 +10,7 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 ôn lại theo **lặp lại ngắt quãng** (spaced repetition). Đồng bộ giữa máy tính và
 điện thoại qua Google Drive.
 
-![Version](https://img.shields.io/badge/extension-v1.3.0-6c5ce7)
+![Version](https://img.shields.io/badge/extension-v1.3.1-6c5ce7)
 ![Android](https://img.shields.io/badge/android-v1.0.1-2ecc71)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20%7C%20Android-lightgrey)
