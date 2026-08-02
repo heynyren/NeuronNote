@@ -111,13 +111,9 @@ async function flashBadge(tabId, text, color) {
 async function captureAndSave(tab, fallbackText, label) {
   try {
     label = label || '';
-    console.log('[NeuronNote] save — tab', tab && tab.id, '| label:', label || '(none)');
     const ok = await ensureContentScript(tab.id);
-    console.log('[NeuronNote] content script ready:', ok);
 
     let cap = ok ? await askTab(tab.id, { type: 'CAPTURE' }) : null;
-    console.log('[NeuronNote] capture:', cap ? (cap.text || '(empty)').slice(0, 40) : 'null',
-      '| fallback:', (fallbackText || '').slice(0, 40));
 
     if (!cap || !cap.text) {
       if (!fallbackText.trim()) {
@@ -149,8 +145,6 @@ async function captureAndSave(tab, fallbackText, label) {
     note.fragUrl = NN.buildFragmentUrl(note);
 
     await NN.putNote(note);
-    const check = await NN.getNotes();
-    console.log('[NeuronNote] ✔ saved', note.id, '| label:', label || '(none)', '| total:', NN.live(check).length);
 
     refreshBadge(tab.id, note.url);
 

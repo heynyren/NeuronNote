@@ -104,8 +104,12 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   };
 
+  // Collapse every Unicode whitespace run — including the ideographic space (U+3000,
+  // common in Japanese text) and the zero-width space (U+200B) — to one plain space.
+  // Must match content.js squash()/makeIndex() so saved text and the on-page text
+  // index normalize identically (otherwise CJK passages fail to re-highlight).
   NN.squash = function (s) {
-    return String(s || '').replace(/\s+/g, ' ').trim();
+    return String(s || '').replace(/[\s\u200b]+/g, ' ').trim();
   };
 
   const TRACKERS = /^(utm_|fbclid$|gclid$|mc_eid$|mc_cid$|igshid$|ref_src$|s_cid$|yclid$|_hs)/i;
