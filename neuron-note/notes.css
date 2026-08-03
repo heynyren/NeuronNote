@@ -329,6 +329,7 @@ kbd {
 /* inline note editor inside the study card */
 .st-edit { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
 .st-edit[hidden] { display: none; }
+.study-card.editing .st-edit { display: block; }
 .study-card.editing .st-reveal,
 .study-card.editing .st-actions,
 .study-card.editing .st-side { display: none; }

@@ -776,6 +776,7 @@
 
     if (act === 'edit') {
       card.classList.add('editing');
+      card.querySelector('.st-edit').hidden = false;
       card.querySelector('.st-edit-note').focus();
       return;
     }
