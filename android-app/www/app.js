@@ -295,6 +295,18 @@
       : Promise.resolve();
     after.then(() => NN.putNote(next)).then(() => {
       state.notes[next.id] = next; $('#editSheet').hidden = true; renderAll(); toast('Saved'); autoSync();
+      // if we edited the current study card, refresh it in place
+      if (state.tab === 'study' && state.study.queue) {
+        const idx = state.study.queue.findIndex(x => x.id === next.id);
+        if (idx >= 0) {
+          state.study.queue[idx] = next;
+          if (idx === state.study.i) {
+            const wasRevealed = state.study.revealed;
+            renderStudyCard();
+            if (wasRevealed) $('#studyStage').querySelector('.st-reveal-btn').click();
+          }
+        }
+      }
     });
   });
   $('#editDelete').addEventListener('click', () => {
@@ -353,6 +365,7 @@
           <button class="btn grade-yes" data-st="yes">Got it</button>
         </div>
         <div class="st-side">
+          <button class="mact" data-st="edit">Edit</button>
           <button class="mact" data-st="hide">Snooze</button>
           <button class="mact" data-st="known">Mastered</button>
         </div>
@@ -368,6 +381,7 @@
     const b = e.target.closest('[data-st]'); if (!b) return;
     const n = state.study.queue[state.study.i]; if (!n) return;
     const act = b.dataset.st;
+    if (act === 'edit') { openEditor(n); return; }
     if (act === 'reveal') {
       const card = $('#studyStage').querySelector('.study-card');
       card.querySelector('.st-reveal').hidden = false;
