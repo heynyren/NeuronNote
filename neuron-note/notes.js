@@ -711,6 +711,19 @@
           ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
           <a class="st-open" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">Open source passage ↗</a>
         </div>
+        <div class="st-edit" hidden>
+          <textarea class="st-edit-note" placeholder="Your note…">${esc(n.note || '')}</textarea>
+          <label class="editor-lbl">Labels</label>
+          <div class="lbl-picker">${pickerHtml(n)}</div>
+          <div class="row">
+            <div class="swatches">
+              ${['amber','mint','sky','rose','lilac'].map(c =>
+                `<button class="sw" data-color="${c}" style="background:var(--${c})" aria-pressed="${(n.color || 'amber') === c}" title="${NN.COLOR_LABEL[c]}"></button>`).join('')}
+            </div>
+            <button class="btn sm" data-st="save-edit">Save</button>
+            <button class="btn ghost sm" data-st="cancel-edit">Cancel</button>
+          </div>
+        </div>
         <div class="st-actions">
           <button class="btn ghost" data-st="reveal">Show note</button>
           <div class="st-grade" hidden>
@@ -719,6 +732,7 @@
           </div>
         </div>
         <div class="st-side">
+          <button class="btn link" data-st="edit">Edit note &amp; labels</button>
           <button class="btn link" data-st="hide">Snooze</button>
           <button class="btn link" data-st="known">Mastered</button>
         </div>
@@ -732,14 +746,80 @@
   }
 
   $('#studyStage').addEventListener('click', e => {
+    // toggle a label chip in the study editor
+    const lchip = e.target.closest('.lbl-picker .lchip');
+    if (lchip && !lchip.classList.contains('add')) {
+      const on = lchip.getAttribute('aria-pressed') === 'true';
+      lchip.setAttribute('aria-pressed', String(!on));
+      return;
+    }
+    // open the new-label input
+    if (e.target.closest('.lchip.add')) {
+      const wrap = e.target.closest('.lchip-add');
+      const inp = wrap.querySelector('.lchip-input');
+      inp.hidden = false; inp.focus();
+      return;
+    }
+    // pick a highlight color
+    const sw = e.target.closest('.st-edit .sw');
+    if (sw) {
+      sw.parentNode.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', String(x === sw)));
+      return;
+    }
+
     const b = e.target.closest('[data-st]');
     if (!b) return;
     const n = study.queue[study.i];
     if (!n) return;
     const act = b.dataset.st;
+    const card = $('#studyStage').querySelector('.study-card');
+
+    if (act === 'edit') {
+      card.classList.add('editing');
+      card.querySelector('.st-edit-note').focus();
+      return;
+    }
+    if (act === 'cancel-edit') {
+      card.classList.remove('editing');
+      renderStudyCard();   // discard unsaved changes
+      return;
+    }
+    if (act === 'save-edit') {
+      const tags = Array.from(card.querySelectorAll('.lbl-picker .lchip[aria-pressed="true"]'))
+        .map(c => c.dataset.name).filter(Boolean);
+      const newLabels = tags.filter(t => t && !(state.settings.labels || []).some(l => l.name === t)
+        && card.querySelector('.lbl-picker .lchip[data-name="' + cssq(t) + '"].new'));
+      const picked = card.querySelector('.st-edit .sw[aria-pressed="true"]');
+      const next = Object.assign({}, n, {
+        note: card.querySelector('.st-edit-note').value.trim(),
+        tags,
+        color: picked ? picked.dataset.color : (n.color || 'amber')
+      });
+      next.updatedAt = Date.now();
+      next.fragUrl = NN.buildFragmentUrl(next);
+
+      const afterSettings = newLabels.length
+        ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, newLabels) }).then(s => { state.settings = s; })
+        : Promise.resolve();
+
+      afterSettings
+        .then(() => NN.putNote(next))
+        .then(() => {
+          state.notes[next.id] = next;
+          study.queue[study.i] = next;
+          const wasRevealed = study.revealed;
+          renderStudyCard();
+          if (wasRevealed) {
+            const c = $('#studyStage').querySelector('.study-card');
+            c.querySelector('[data-st="reveal"]').click();
+          }
+          toast('Saved');
+          autoSync();
+        });
+      return;
+    }
 
     if (act === 'reveal') {
-      const card = $('#studyStage').querySelector('.study-card');
       card.querySelector('.st-reveal').hidden = false;
       card.querySelector('[data-st="reveal"]').hidden = true;
       card.querySelector('.st-grade').hidden = false;
@@ -766,11 +846,42 @@
     }
   });
 
+  // create a new label right in the study editor (Enter)
+  $('#studyStage').addEventListener('keydown', e => {
+    const inp = e.target.closest && e.target.closest('.lchip-input');
+    if (!inp) return;
+    if (e.key === 'Escape') { e.stopPropagation(); inp.hidden = true; inp.value = ''; return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const name = NN.squash(inp.value);
+    if (!name) return;
+    const picker = inp.closest('.lbl-picker');
+    if (picker.querySelector('.lchip[data-name="' + cssq(name) + '"]')) {
+      picker.querySelector('.lchip[data-name="' + cssq(name) + '"]').setAttribute('aria-pressed', 'true');
+    } else {
+      const color = NN.nextLabelColor(state.settings);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'lchip new';
+      chip.dataset.name = name;
+      chip.setAttribute('aria-pressed', 'true');
+      chip.innerHTML = '<span class="ldot" style="background:var(--' + esc(color) + ')"></span>' + esc(name);
+      inp.closest('.lchip-add').before(chip);
+    }
+    inp.value = ''; inp.hidden = true;
+  });
+
   // study shortcuts: Space=flip, 1/←=Not yet, 2/→/Enter=Got it
   document.addEventListener('keydown', e => {
     if ($('#study').hidden) return;
-    if (e.key === 'Escape') { closeStudy(); return; }
     const card = $('#studyStage').querySelector('.study-card');
+    // while editing a note/label, keep keystrokes out of the flashcard shortcuts
+    const editing = card && card.classList.contains('editing');
+    if (editing) {
+      if (e.key === 'Escape') { card.querySelector('[data-st="cancel-edit"]').click(); }
+      return;
+    }
+    if (e.key === 'Escape') { closeStudy(); return; }
     if (!card) return;
     if (!study.revealed) {
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); card.querySelector('[data-st="reveal"]').click(); }
