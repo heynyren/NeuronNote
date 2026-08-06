@@ -263,7 +263,12 @@ async function syncNow() {
     catch (e) { throw new Error('Server did not return JSON. Check that the Web App access is set to "Anyone".'); }
     if (!data.ok) throw new Error(data.error || 'Sync failed.');
 
-    const merged = NN.merge(local, data.notes || {});
+    // Re-read local right before merging. A grade/edit made *during* the slow
+    // network round-trip must not be clobbered by the stale snapshot we sent
+    // (e.g. a "Got it" that bumped level 0→1 would otherwise revert to 0).
+    // Newest-wins merge keeps the in-flight change because its updatedAt is newer.
+    const freshLocal = await NN.getNotes();
+    const merged = NN.merge(freshLocal, data.notes || {});
     await NN.setNotes(merged.notes);
     const now = Date.now();
     await NN.saveSettings({ lastSync: now });

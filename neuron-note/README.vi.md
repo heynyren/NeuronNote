@@ -1,6 +1,6 @@
 **🌐 [English](README.md) · Tiếng Việt**
 
-# Neuron Note v1.4.0
+# Neuron Note v1.4.1
 
 Bôi đen một đoạn bất kỳ trên web → chuột phải, chọn **nhãn** → lưu thẳng, kèm
 **link quay về đúng vị trí**. Ôn lại theo **lặp lại ngắt quãng**, lọc nhiều nhãn,
