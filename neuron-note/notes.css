@@ -332,7 +332,22 @@ kbd {
 .grade-inline .grade-yes:hover { color: #fff; background: var(--signal); }
 .grade-inline .grade-no { color: var(--danger); background: none; }
 .grade-inline .grade-no:hover { color: #fff; background: var(--danger); }
-.st-side { margin-top: 16px; display: flex; gap: 6px; }
+.st-side { margin-top: 16px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* inline note editor inside the study card */
+.st-edit { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
+.st-edit[hidden] { display: none; }
+.study-card.editing .st-edit { display: block; }
+.study-card.editing .st-reveal,
+.study-card.editing .st-actions,
+.study-card.editing .st-side { display: none; }
+.st-edit textarea, .st-edit input {
+  width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  font: 14px/1.5 var(--sans); background: #FFF; color: var(--ink); margin-bottom: 8px;
+}
+.st-edit textarea { min-height: 72px; resize: vertical; }
+.st-edit .lchip-input { width: 130px; margin: 0 !important; }
+.st-edit .row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 2px; }
 
 .study-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
 .study-done[hidden] { display: none; }
