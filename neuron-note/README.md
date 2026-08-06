@@ -1,6 +1,6 @@
 **🌐 English · [Tiếng Việt](README.vi.md)**
 
-# Neuron Note v1.3.1
+# Neuron Note v1.4.0
 
 Select any passage on a web page → right-click, choose a **label** → it's saved
 instantly, together with a **link back to the exact spot**. Review it with
