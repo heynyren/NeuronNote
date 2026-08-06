@@ -265,6 +265,75 @@
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   };
 
+  /* ---------- duplicate detection & merge ---------- */
+  // Two live notes are duplicates when they point at the same page and their
+  // (normalized) text is identical — i.e. the same passage saved more than once.
+  NN.dupKey = function (n) {
+    var t = NN.squash(n.text).toLowerCase();
+    if (!t) return '';
+    return NN.normalizeUrl(n.url) + ' ' + t;
+  };
+
+  /** Groups of live notes that are duplicates of each other (each group length >= 2). */
+  NN.duplicateGroups = function (notes) {
+    var byKey = {};
+    NN.live(notes).forEach(function (n) {
+      var k = NN.dupKey(n);
+      if (!k) return;
+      (byKey[k] = byKey[k] || []).push(n);
+    });
+    return Object.keys(byKey).map(function (k) { return byKey[k]; }).filter(function (g) { return g.length > 1; });
+  };
+
+  /**
+   * Merge duplicate passages. For each group: keep the earliest-created note as the
+   * canonical one, union its labels, combine distinct notes, keep the most-advanced
+   * study level with the soonest due date, and bias toward staying in study. The
+   * other copies become tombstones so the deletion syncs. Returns { notes, groups, removed }.
+   */
+  NN.mergeDuplicates = function (notes) {
+    var out = Object.assign({}, notes);
+    var groups = NN.duplicateGroups(notes);
+    var removed = 0;
+    var now = Date.now();
+
+    groups.forEach(function (group) {
+      var sorted = group.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+      var keep = Object.assign({}, sorted[0]);
+      NN.ensureSrs(keep);
+      keep.srs = Object.assign({}, keep.srs);
+
+      var tags = {};
+      (keep.tags || []).forEach(function (t) { tags[t] = 1; });
+      var noteParts = [];
+      if (NN.squash(keep.note)) noteParts.push(keep.note.trim());
+      var anyActive = NN.inStudy(keep);
+
+      sorted.slice(1).forEach(function (dup) {
+        (dup.tags || []).forEach(function (t) { tags[t] = 1; });
+        var dn = (dup.note || '').trim();
+        if (dn && noteParts.indexOf(dn) === -1) noteParts.push(dn);
+        NN.ensureSrs(dup);
+        if ((dup.srs.box || 0) > (keep.srs.box || 0)) keep.srs.box = dup.srs.box;
+        keep.srs.reps = Math.max(keep.srs.reps || 0, dup.srs.reps || 0);
+        keep.srs.lapses = (keep.srs.lapses || 0) + (dup.srs.lapses || 0);
+        keep.srs.due = Math.min(keep.srs.due || now, dup.srs.due || now);
+        if (NN.inStudy(dup)) anyActive = true;
+        out[dup.id] = { id: dup.id, deleted: true, updatedAt: now, url: dup.url || '', createdAt: dup.createdAt || now };
+        removed++;
+      });
+
+      if (anyActive) { keep.srs.known = false; keep.srs.learn = true; }
+      keep.tags = Object.keys(tags);
+      if (noteParts.length) keep.note = noteParts.join('\n\n');
+      keep.updatedAt = now;
+      // text is identical across duplicates, so the canonical note's fragUrl already matches.
+      out[keep.id] = keep;
+    });
+
+    return { notes: out, groups: groups.length, removed: removed };
+  };
+
   /* ---------- sync merge: newer wins ---------- */
   NN.merge = function (local, remote) {
     const out = {};

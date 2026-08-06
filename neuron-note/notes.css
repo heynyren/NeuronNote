@@ -324,6 +324,14 @@ kbd {
 .grade-yes:hover { background: #00615F; }
 .grade-no { color: var(--danger); border-color: #E7C4BF; }
 .grade-no:hover { background: #F6E2DF; }
+
+/* inline grade buttons on each library card */
+.grade-inline { display: inline-flex; gap: 2px; margin-left: 4px; }
+.grade-inline .btn.link { font-weight: 600; }
+.grade-inline .grade-yes { color: var(--signal); background: none; }
+.grade-inline .grade-yes:hover { color: #fff; background: var(--signal); }
+.grade-inline .grade-no { color: var(--danger); background: none; }
+.grade-inline .grade-no:hover { color: #fff; background: var(--danger); }
 .st-side { margin-top: 16px; display: flex; gap: 6px; }
 
 .study-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }

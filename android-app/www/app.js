@@ -116,6 +116,7 @@
         <span>${esc(NN.hostOf(n.url) || 'note')}</span><span>·</span><span>${when(n.createdAt)}</span>
         ${srsBadge(n)}
         <span class="meta-acts">
+          ${NN.inStudy(n) ? '<button class="mact grade-no" data-act="grade-no">Not yet</button><button class="mact grade-yes" data-act="grade-yes">Got it</button>' : ''}
           ${isHttp(n.url) ? '<button class="mact" data-act="open">Open</button>' : ''}
           <button class="mact" data-act="toggle">${toggleTxt}</button>
           <button class="mact edit" data-act="edit">Edit</button>
@@ -150,6 +151,16 @@
     const act = btn.dataset.act;
     if (act === 'open') { openUrl(note.fragUrl || note.url); return; }
     if (act === 'edit') { openEditor(note); return; }
+    if (act === 'grade-yes' || act === 'grade-no') {
+      const next = Object.assign({}, note); NN.ensureSrs(next); next.srs = Object.assign({}, next.srs);
+      NN.grade(next, act === 'grade-yes');
+      NN.putNote(next).then(() => {
+        state.notes[id] = next; renderAll();
+        toast((act === 'grade-yes' ? 'Got it → level ' : 'Not yet → level ') + next.srs.box + ' · ' + dueLabel(next.srs.due));
+        autoSync();
+      });
+      return;
+    }
     if (act === 'toggle') {
       const next = Object.assign({}, note); NN.ensureSrs(next); next.srs = Object.assign({}, next.srs);
       const s = next.srs; let msg;
@@ -511,6 +522,23 @@
   function autoSync() { if (state.settings.autoSync !== false && state.settings.syncUrl) syncNow(); }
   $('#btnSync').addEventListener('click', syncNow);
   $('#syncNow2').addEventListener('click', () => { saveSettingsClose(); setTimeout(syncNow, 50); });
+
+  /* ---------------- FIND & MERGE DUPLICATES ---------------- */
+  $('#btnDedup').addEventListener('click', () => {
+    const groups = NN.duplicateGroups(state.notes);
+    if (!groups.length) { $('#dedupMsg').textContent = 'No duplicates found — nothing to merge.'; return; }
+    const extra = groups.reduce((a, g) => a + (g.length - 1), 0);
+    if (!confirm('Found ' + groups.length + ' passage(s) saved more than once (' + extra + ' extra copies). '
+      + 'Merge each into a single card? Labels, notes and the best study progress are kept.')) return;
+    const res = NN.mergeDuplicates(state.notes);
+    NN.setNotes(res.notes)
+      .then(() => load())
+      .then(() => {
+        $('#dedupMsg').textContent = 'Merged ' + res.groups + ' group(s), removed ' + res.removed + ' duplicate(s).';
+        toast('Merged ' + res.removed + ' duplicate passage(s)');
+        autoSync();
+      });
+  });
 
   /* ---------------- BACKUP / IMPORT ---------------- */
   $('#btnBackup').addEventListener('click', () => {
