@@ -526,9 +526,14 @@
     return NN.getNotes().then(local =>
       nnPost(s.syncUrl, { action: 'sync', key: s.syncKey || '', notes: local }).then(data => {
         if (!data || !data.ok) throw new Error((data && data.error) || 'Server error');
-        const m = NN.merge(local, data.notes || {});
-        return NN.setNotes(m.notes).then(() => NN.saveSettings({ lastSync: Date.now() })).then(() => {
-          return load().then(() => toast('Synced · ' + NN.live(m.notes).length + ' passages'));
+        // Re-read local right before merging so a grade/edit made *during* the
+        // slow network round-trip isn't clobbered by the stale snapshot we sent
+        // (e.g. a "Got it" bumping level 0→1 would otherwise revert to 0).
+        return NN.getNotes().then(freshLocal => {
+          const m = NN.merge(freshLocal, data.notes || {});
+          return NN.setNotes(m.notes).then(() => NN.saveSettings({ lastSync: Date.now() })).then(() => {
+            return load().then(() => toast('Synced · ' + NN.live(m.notes).length + ' passages'));
+          });
         });
       })
     ).catch(err => { toast('Sync error: ' + (err.message || err)); }).then(() => { syncing = false; });
