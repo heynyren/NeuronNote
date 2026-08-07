@@ -621,6 +621,24 @@
   }
   $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
+  /* ---------------- ANDROID HARDWARE / GESTURE BACK ---------------- */
+  // Give the physical + edge-swipe "back" a predictable stack: close an open sheet,
+  // then fall back to the library tab, and only leave the app from there. Without a
+  // listener Android's back — especially the gesture-navigation edge swipe — has no
+  // history to pop and drops straight out of the app.
+  const AppPlugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App;
+  if (AppPlugin) {
+    AppPlugin.addListener('backButton', () => {
+      // 1) A modal sheet is open → close it (same as tapping its ✕ / the backdrop).
+      if (!$('#setSheet').hidden) { saveSettingsClose(); return; }
+      if (!$('#editSheet').hidden) { $('#editSheet').hidden = true; return; }
+      // 2) Not on the main library screen → go back to it instead of exiting.
+      if (state.tab !== 'lib') { switchTab('lib'); return; }
+      // 3) Already at the top of the app → let back leave the app.
+      AppPlugin.exitApp();
+    });
+  }
+
   /* ---------------- STARTUP ---------------- */
   load().then(() => { checkIncoming(); });
 
