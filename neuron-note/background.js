@@ -1,5 +1,6 @@
 /* Neuron Note — service worker */
 importScripts('shared.js');
+importScripts('progress.js');   // NN.mergeProgress — needed when syncing
 
 const MENU_SAVE = 'nn-save';
 const MENU_OPEN = 'nn-open';
@@ -154,6 +155,9 @@ async function captureAndSave(tab, fallbackText, label) {
     note.fragUrl = NN.buildFragmentUrl(note);
 
     await NN.putNote(note);
+    // Count the day's new passages for the Progress panel. A failure here must
+    // never take the save down with it — the passage matters, the tally doesn't.
+    try { await NN.recordSaved(1); } catch (e) { /* ignore */ }
 
     refreshBadge(tab.id, note.url);
 
@@ -274,7 +278,10 @@ async function syncNow() {
       method: 'POST',
       // text/plain to avoid Apps Script's CORS preflight
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'sync', key: s.syncKey || '', notes: outgoing })
+      body: JSON.stringify({
+        action: 'sync', key: s.syncKey || '', notes: outgoing,
+        progress: await NN.getProgress()
+      })
     });
     const raw = await res.text();
     let data;
@@ -297,6 +304,13 @@ async function syncNow() {
       }
     });
     await NN.setNotes(merged.notes);
+    // Progress merges by its own rule (see NN.mergeProgress): counts take the
+    // larger side rather than the newer one, so reviews done on the phone and on
+    // the laptop on the same day both survive. A server that has not been
+    // updated yet simply returns nothing here, and the local record stands.
+    if (data.progress) {
+      await NN.setProgress(NN.mergeProgress(await NN.getProgress(), data.progress));
+    }
     const now = Date.now();
     await NN.saveSettings({ lastSync: now });
     return { ok: true, at: now, added: merged.added, updated: merged.updated, total: NN.live(merged.notes).length };

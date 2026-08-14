@@ -1,11 +1,14 @@
 {
   "name": "neuron-note-android",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Neuron Note — Android app that syncs with the desktop extension",
   "author": "Nyren Pham (https://github.com/heynyren)",
   "license": "AGPL-3.0-only",
   "homepage": "https://github.com/heynyren/NeuronNote",
-  "repository": { "type": "git", "url": "https://github.com/heynyren/NeuronNote.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heynyren/NeuronNote.git"
+  },
   "private": true,
   "scripts": {
     "test": "node test.js",

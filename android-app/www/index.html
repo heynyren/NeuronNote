@@ -69,6 +69,14 @@
 </section>
 
 <!-- ==== ADD (paste & save) ==== -->
+<section class="screen" id="scr-prog" hidden>
+  <header class="hdr">
+    <div class="brand"><span class="wordmark">Progress</span></div>
+    <div class="hdr-actions"><span class="lib-count" id="progStreak"></span></div>
+  </header>
+  <div class="prog-body" id="progressBody"></div>
+</section>
+
 <section class="screen" id="scr-add" hidden>
   <header class="hdr"><div class="brand"><span class="wordmark">Add a note</span></div></header>
   <div class="add-body">
@@ -87,6 +95,7 @@
 <nav class="tabbar">
   <button class="tab on" data-tab="lib"><span class="ti">▤</span>Notebook</button>
   <button class="tab" data-tab="study"><span class="ti">◆</span>Study<span class="tab-badge" id="tabDue" hidden>0</span></button>
+  <button class="tab" data-tab="prog"><span class="ti">▲</span>Progress</button>
   <button class="tab" data-tab="add"><span class="ti">＋</span>Add</button>
 </nav>
 
@@ -161,6 +170,7 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="shared.js"></script>
+<script src="progress.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
