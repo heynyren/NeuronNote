@@ -309,8 +309,22 @@
   }
 
   const CSS = `
-  :host { all: initial; }
-  * { box-sizing: border-box; font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+  :host {
+    all: initial;
+    /* Vietnamese/Japanese-safe stacks, mirroring notes.css. Faces without the
+       Vietnamese tone-mark range come after the ones that have it, so "ệ ộ ữ"
+       never drops to a mismatched fallback mid-word. */
+    --nn-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+               "Segoe UI", Roboto, "Noto Sans", Arial,
+               "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", Meiryo, sans-serif;
+    --nn-serif: ui-serif, "New York", Cambria, Constantia, "Noto Serif",
+                "Times New Roman", "Hiragino Mincho ProN", "Yu Mincho",
+                "Noto Serif JP", serif;
+    --nn-mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Consolas,
+               "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono",
+               "BIZ UDGothic", "Noto Sans Mono CJK JP", monospace;
+  }
+  * { box-sizing: border-box; font-family: var(--nn-sans); }
   .card, .toast {
     position: fixed; background: #F7F7F3; color: #191C22;
     border: 1px solid #D6D7CE; border-radius: 12px;
@@ -320,7 +334,7 @@
   .card { width: 320px; padding: 12px; }
   .head {
     display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
-    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font: 600 10px/1 var(--nn-mono);
     letter-spacing: .14em; text-transform: uppercase; color: #6C7079;
   }
   .head .dot { width: 7px; height: 7px; border-radius: 50%; background: #007D7A; flex: none; }
@@ -330,12 +344,12 @@
   }
   .head .x:hover { background: #E7E8E0; }
   .quote {
-    font: italic 13px/1.5 Georgia, "Times New Roman", serif;
+    font: italic 13px/1.5 var(--nn-serif);
     max-height: 76px; overflow: auto; margin: 0 0 10px;
     padding-left: 9px; border-left: 2px solid #FFD75E; color: #34383F;
   }
   label {
-    display: block; font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: block; font: 600 9px/1 var(--nn-mono);
     letter-spacing: .12em; text-transform: uppercase; color: #6C7079; margin: 0 0 4px;
   }
   textarea, input[type=text] {
@@ -348,7 +362,7 @@
   .lbl-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .lchip {
     display: inline-flex; align-items: center; gap: 6px;
-    font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 600 11px/1 var(--nn-mono);
     padding: 5px 9px; border-radius: 999px; cursor: pointer;
     background: #FFF; border: 1px solid #D6D7CE; color: #191C22;
   }
@@ -374,7 +388,7 @@
   button.danger:hover { background: #F6E2DF; }
   .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
   .tag {
-    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 600 10px/1 var(--nn-mono);
     background: #E2EFEE; color: #005E5C; padding: 4px 7px; border-radius: 999px;
   }
   .note-text { font: 13px/1.5 inherit; white-space: pre-wrap; margin: 0 0 10px; }
