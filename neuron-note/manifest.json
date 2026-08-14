@@ -1,18 +1,35 @@
 {
   "manifest_version": 3,
   "name": "Neuron Note",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Select text → pick a label → save instantly, with a link back to the exact spot. Syncs via Google Drive.",
   "author": "Nyren Pham",
   "homepage_url": "https://github.com/heynyren/NeuronNote",
-  "permissions": ["contextMenus", "storage", "scripting", "activeTab", "alarms"],
-  "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js" },
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "scripting",
+    "activeTab",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
@@ -35,7 +52,9 @@
   },
   "commands": {
     "save-selection": {
-      "suggested_key": { "default": "Alt+Shift+N" },
+      "suggested_key": {
+        "default": "Alt+Shift+N"
+      },
       "description": "Save the selected passage to Neuron Note"
     }
   },

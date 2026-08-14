@@ -12,9 +12,21 @@
   --mark:   #FFD75E;
   --danger: #A3352A;
 
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  /* Font stacks tuned for Vietnamese + Japanese + Latin.
+     Order matters: fonts are matched per character, so a face missing Vietnamese
+     tone marks (U+1EA0–U+1EF9) makes "ệ ộ ữ" drop to the next font mid-word and
+     the line goes ragged. Every face listed before the Japanese ones therefore
+     has full Vietnamese coverage; the JP faces sit last so only kana/kanji reach
+     them. Georgia and plain "Segoe UI" were the previous culprits. */
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Consolas,
+          "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono",
+          "BIZ UDGothic", "Noto Sans Mono CJK JP", monospace;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+          "Segoe UI", Roboto, "Noto Sans", Arial,
+          "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", Meiryo, sans-serif;
+  --serif: ui-serif, "New York", Cambria, Constantia, "Noto Serif",
+           "Times New Roman", "Hiragino Mincho ProN", "Yu Mincho",
+           "Noto Serif JP", serif;
 
   --amber: #FFE59E; --mint: #B7EBD8; --sky: #BFDDFA; --rose: #FBC9D2; --lilac: #DCD1FA;
 }
@@ -421,3 +433,55 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------- công thức (KaTeX) ---------- */
+/* A long formula must scroll inside its own box instead of stretching the card. */
+.quote .katex-display, .st-quote .katex-display,
+.mynote .katex-display, .st-note .katex-display {
+  overflow-x: auto; overflow-y: hidden; padding: 2px 0; margin: .5em 0;
+}
+.katex { font-size: 1.05em; }
+.st-quote .katex { font-size: 1em; }
+/* KaTeX renders upright; the passage around it is italic serif, so undo the slant. */
+.quote .katex, .st-quote .katex { font-style: normal; }
+/* LaTeX that KaTeX could not parse — show the source rather than dropping it. */
+.tex-raw {
+  font: 12px var(--mono); background: #F0EFE8; border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 5px; color: var(--danger); font-style: normal;
+}
+
+/* ---------- đính kèm ---------- */
+.files { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.files.view { margin: 10px 0 0; }
+.note.editing .files.view { display: none; }   /* the editor shows its own copy */
+.file-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  border: 1px solid var(--line); background: #FFF; border-radius: 8px;
+  padding: 4px 8px 4px 5px; cursor: pointer; font: 12px var(--sans);
+}
+.file-chip:hover { border-color: var(--signal); }
+.file-chip img {
+  width: 34px; height: 34px; object-fit: cover; border-radius: 5px;
+  background: #ECECE4; flex: none; display: block;
+}
+.file-ico {
+  width: 34px; height: 34px; border-radius: 5px; background: var(--signal-soft);
+  color: var(--signal); font: 600 9px/34px var(--mono); text-align: center; flex: none;
+}
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.file-size { color: var(--muted); font: 10px var(--mono); flex: none; }
+.file-del {
+  border: 0; background: none; color: var(--muted); cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 3px 4px; border-radius: 5px; flex: none;
+}
+.file-del:hover { background: #F6E2DF; color: var(--danger); }
+.file-add {
+  display: inline-flex; align-items: center; cursor: pointer;
+  border: 1px dashed var(--line); border-radius: 8px; padding: 7px 10px;
+  font: 600 11px/1 var(--mono); color: var(--muted);
+}
+.file-add:hover { border-color: var(--signal); color: var(--signal); }
+.file-hint { font: 11px var(--sans); color: var(--muted); }
+
+/* attachments shown on a study card */
+.st-reveal .files.view { margin-top: 12px; }

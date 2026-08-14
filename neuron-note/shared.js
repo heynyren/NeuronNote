@@ -112,6 +112,234 @@
     return String(s || '').replace(/[\s\u200b]+/g, ' ').trim();
   };
 
+
+  /* ================= math (LaTeX) =================
+     Two jobs live here:
+       1. Text copied out of a PDF or a rendered page arrives as Unicode glyphs
+          ("x² + √2 ≤ ∞"). unicodeToLatex() turns those back into LaTeX.
+       2. Text captured from KaTeX/MathJax already carries real LaTeX (content.js
+          reads it out of <annotation encoding="application/x-tex">), so it only
+          needs the segment markers.
+     Formulas are stored inline in the note text as $…$ (inline) or $$…$$ (block),
+     which is what the renderer looks for. */
+
+  // Characters that survive a copy but are not what the author typed.
+  const TEXT_ARTIFACTS = [
+    [/\u00ad/g, ''],            // soft hyphen — PDF line-break leftovers
+    [/\ufeff/g, ''],            // zero-width no-break space
+    [/\u00a0/g, ' '],           // non-breaking space
+    [/\ufb01/g, 'fi'], [/\ufb02/g, 'fl'],   // ligatures PDFs love
+    [/\ufb00/g, 'ff'], [/\ufb03/g, 'ffi'], [/\ufb04/g, 'ffl']
+  ];
+
+  /** Cleanup that is safe on ANY text, math or prose. */
+  NN.fixCopyArtifacts = function (s) {
+    let out = String(s || '');
+    TEXT_ARTIFACTS.forEach(p => { out = out.replace(p[0], p[1]); });
+    return out;
+  };
+
+  const SUP = { '\u2070':'0','\u00b9':'1','\u00b2':'2','\u00b3':'3','\u2074':'4','\u2075':'5',
+    '\u2076':'6','\u2077':'7','\u2078':'8','\u2079':'9','\u207a':'+','\u207b':'-','\u207c':'=',
+    '\u207d':'(','\u207e':')','\u207f':'n','\u2071':'i' };
+  const SUB = { '\u2080':'0','\u2081':'1','\u2082':'2','\u2083':'3','\u2084':'4','\u2085':'5',
+    '\u2086':'6','\u2087':'7','\u2088':'8','\u2089':'9','\u208a':'+','\u208b':'-','\u208c':'=',
+    '\u208d':'(','\u208e':')','\u2090':'a','\u2091':'e','\u2092':'o','\u2093':'x','\u2095':'h',
+    '\u2096':'k','\u2097':'l','\u2098':'m','\u2099':'n','\u209a':'p','\u209b':'s','\u209c':'t' };
+
+  const GREEK = {
+    '\u03b1':'\\alpha','\u03b2':'\\beta','\u03b3':'\\gamma','\u03b4':'\\delta','\u03b5':'\\varepsilon',
+    '\u03b6':'\\zeta','\u03b7':'\\eta','\u03b8':'\\theta','\u03b9':'\\iota','\u03ba':'\\kappa',
+    '\u03bb':'\\lambda','\u03bc':'\\mu','\u03bd':'\\nu','\u03be':'\\xi','\u03c0':'\\pi',
+    '\u03c1':'\\rho','\u03c3':'\\sigma','\u03c2':'\\varsigma','\u03c4':'\\tau','\u03c5':'\\upsilon',
+    '\u03c6':'\\varphi','\u03c7':'\\chi','\u03c8':'\\psi','\u03c9':'\\omega',
+    '\u0393':'\\Gamma','\u0394':'\\Delta','\u0398':'\\Theta','\u039b':'\\Lambda','\u039e':'\\Xi',
+    '\u03a0':'\\Pi','\u03a3':'\\Sigma','\u03a5':'\\Upsilon','\u03a6':'\\Phi','\u03a8':'\\Psi','\u03a9':'\\Omega'
+  };
+
+  const SYMBOL = {
+    '\u2212':'-','\u2013':'-','\u00d7':'\\times','\u00f7':'\\div','\u00b1':'\\pm','\u2213':'\\mp',
+    '\u2264':'\\leq','\u2265':'\\geq','\u2260':'\\neq','\u2248':'\\approx','\u2261':'\\equiv',
+    '\u221d':'\\propto','\u223c':'\\sim','\u2245':'\\cong',
+    '\u221e':'\\infty','\u222b':'\\int','\u222c':'\\iint','\u222d':'\\iiint','\u222e':'\\oint',
+    '\u2211':'\\sum','\u220f':'\\prod','\u221a':'\\sqrt','\u2202':'\\partial','\u2207':'\\nabla',
+    '\u2208':'\\in','\u2209':'\\notin','\u220b':'\\ni','\u2282':'\\subset','\u2283':'\\supset',
+    '\u2286':'\\subseteq','\u2287':'\\supseteq','\u222a':'\\cup','\u2229':'\\cap',
+    '\u2205':'\\emptyset','\u2200':'\\forall','\u2203':'\\exists','\u2204':'\\nexists',
+    '\u00ac':'\\neg','\u2227':'\\wedge','\u2228':'\\vee',
+    '\u2192':'\\to','\u2190':'\\leftarrow','\u2194':'\\leftrightarrow',
+    '\u21d2':'\\Rightarrow','\u21d0':'\\Leftarrow','\u21d4':'\\iff','\u21a6':'\\mapsto',
+    '\u22c5':'\\cdot','\u2218':'\\circ','\u2295':'\\oplus','\u2297':'\\otimes',
+    '\u2220':'\\angle','\u22a5':'\\perp','\u2225':'\\parallel','\u00b0':'^{\\circ}',
+    '\u2026':'\\dots','\u22ef':'\\cdots','\u22ee':'\\vdots','\u22f1':'\\ddots',
+    '\u211d':'\\mathbb{R}','\u2115':'\\mathbb{N}','\u2124':'\\mathbb{Z}','\u211a':'\\mathbb{Q}',
+    '\u2102':'\\mathbb{C}','\u2135':'\\aleph','\u2113':'\\ell','\u210f':'\\hbar'
+  };
+
+  /** Collapse a run of Unicode super/subscripts into ^{…} / _{…}. */
+  function foldScripts(s) {
+    return s
+      .replace(/[\u2070\u00b9\u00b2\u00b3\u2074-\u207f\u2071]+/g, run => {
+        const t = run.split('').map(c => SUP[c] || '').join('');
+        return t ? (t.length === 1 ? '^' + t : '^{' + t + '}') : '';
+      })
+      .replace(/[\u2080-\u208e\u2090-\u209c]+/g, run => {
+        const t = run.split('').map(c => SUB[c] || '').join('');
+        return t ? (t.length === 1 ? '_' + t : '_{' + t + '}') : '';
+      });
+  }
+
+  /** Convert a string that IS math into LaTeX source. */
+  NN.unicodeToLatex = function (s) {
+    let out = NN.fixCopyArtifacts(s);
+    out = foldScripts(out);
+    out = out.replace(/[\u0370-\u03ff]/g, c => GREEK[c] || c);
+    out = out.replace(/[\u2013\u2212\u00d7\u00f7\u00b1\u2213\u2264\u2265\u2260\u2248\u2261\u221d\u223c\u2245\u221e\u222b-\u222e\u2211\u220f\u221a\u2202\u2207\u2208\u2209\u220b\u2282\u2283\u2286\u2287\u222a\u2229\u2205\u2200\u2203\u2204\u00ac\u2227\u2228\u2192\u2190\u2194\u21d2\u21d0\u21d4\u21a6\u22c5\u2218\u2295\u2297\u2220\u22a5\u2225\u00b0\u2026\u22ef\u22ee\u22f1\u211d\u2115\u2124\u211a\u2102\u2135\u2113\u210f]/g,
+      c => {
+        const tex = SYMBOL[c];
+        if (!tex) return c;
+        // a control word needs a break before a following letter: \alpha x, not \alphax
+        return /^\\[a-zA-Z]+$/.test(tex) ? tex + ' ' : tex;
+      });
+    // √x with no braces is not valid LaTeX — \sqrt needs an argument
+    out = out.replace(/\\sqrt\s*\{/g, '\\sqrt{')
+             .replace(/\\sqrt\s+([A-Za-z0-9])/g, '\\sqrt{$1}');
+    // a script binds tight: \int_0, never \int _0
+    out = out.replace(/\\([a-zA-Z]+)[ \t]+(?=[_^])/g, '\\$1');
+    return out.replace(/[ \t]+/g, ' ').trim();
+  };
+
+  // A character that only ever shows up in mathematics.
+  const MATH_SIGNAL = /[\u2070\u00b9\u00b2\u00b3\u2074-\u207f\u2080-\u209c\u0370-\u03ff\u2212\u00d7\u00f7\u00b1\u2264\u2265\u2260\u2248\u2261\u221e\u222b\u2211\u220f\u221a\u2202\u2207\u2208\u2282\u222a\u2229\u2200\u2203\u2192\u21d2\u22c5\u211d\u2115\u2124\u211a\u2102]/;
+
+  /** Is this string already carrying LaTeX segment markers? */
+  NN.hasMath = function (s) { return /\$\$?[^$]+\$\$?/.test(String(s || '')); };
+
+  /**
+   * Best-effort: find formula-looking runs in loose text (a PDF paste) and turn
+   * them into $…$ LaTeX. Text already containing $…$ is left alone so running
+   * this twice is harmless. Deliberately conservative — a run must hold a
+   * character that has no meaning outside mathematics.
+   */
+  // A token made only of symbols/digits (no letters at all) — the glue between
+  // formula pieces, e.g. the "+" and "=" in "x\u00b2 + y\u00b2 = z\u00b2".
+  function isGlue(tok) { return !/[A-Za-z\u00c0-\u024f\u1e00-\u1eff\u0370-\u03ff\u3000-\u9fff]/.test(tok); }
+
+  /**
+   * Wrap the formula-looking tokens of one chunk, leaving prose alone. Works token
+   * by token (never across a whole sentence) and then grows each hit outward over
+   * neighbouring glue tokens so "x\u00b2 + y\u00b2" comes out as one formula.
+   */
+  function mathifyChunk(chunk) {
+    const toks = chunk.split(/([ \t]+)/);          // keeps the separators
+    const isTok = i => i % 2 === 0;
+    const sig = toks.map((t, i) => isTok(i) && MATH_SIGNAL.test(t));
+    if (!sig.some(Boolean)) return chunk;
+
+    const take = toks.map(() => false);
+    for (let i = 0; i < toks.length; i++) {
+      if (!sig[i]) continue;
+      take[i] = true;
+      for (let j = i - 2; j >= 0 && isGlue(toks[j]); j -= 2) { take[j] = true; take[j + 1] = true; }
+      for (let j = i + 2; j < toks.length && isGlue(toks[j]); j += 2) { take[j] = true; take[j - 1] = true; }
+    }
+    // stitch the marked tokens back together, one $…$ per contiguous run
+    let out = '', run = '';
+    const flush = () => {
+      if (!run) return;
+      const m = run.match(/^([\s\S]*?)([.,;:!?)\]]*)$/);
+      const core = (m[1] || '').trim(), tail = m[2] || '';
+      out += core && MATH_SIGNAL.test(core) ? '$' + NN.unicodeToLatex(core) + '$' + tail : run;
+      run = '';
+    };
+    for (let i = 0; i < toks.length; i++) {
+      if (take[i]) run += toks[i];
+      else { flush(); out += toks[i]; }
+    }
+    flush();
+    return out;
+  }
+
+  NN.autoMath = function (s) {
+    const src = NN.fixCopyArtifacts(s);
+    if (!src) return '';
+    // split on existing $…$ so we never touch what is already marked up
+    const parts = src.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/);
+    return parts.map(part => {
+      if (!part || /^\$/.test(part)) return part;
+      return part.replace(/\S+(?:[ \t]+\S+)*/g, chunk => mathifyChunk(chunk));
+    }).join('');
+  };
+
+  /**
+   * Bring loose LaTeX to the standard form KaTeX accepts. PDFs and chat exports
+   * are full of near-miss source: \(…\) and \[…\] delimiters, environments with
+   * no delimiters at all, backslashes doubled by a JSON round-trip, and dollar
+   * signs that a copy step turned into \$. Everything here is idempotent.
+   */
+  NN.repairLatex = function (s) {
+    let out = NN.fixCopyArtifacts(s);
+    // \$ that meant a literal delimiter, not an escaped dollar
+    out = out.replace(/\\\$/g, '$');
+    // a JSON/markdown round-trip doubles every control sequence
+    out = out.replace(/\\\\([a-zA-Z]{2,})/g, '\\$1');
+    // \(inline\) and \[display\] → $…$ / $$…$$
+    out = out.replace(/\\\(([\s\S]*?)\\\)/g, (m, g) => '$' + g.trim() + '$');
+    out = out.replace(/\\\[([\s\S]*?)\\\]/g, (m, g) => '$$' + g.trim() + '$$');
+    // a bare environment is display math even without delimiters
+    out = out.replace(/(^|[^$])(\\begin\{(align|equation|gather|aligned|cases|array|matrix|[bpvBV]matrix)\*?\}[\s\S]*?\\end\{\3\*?\})/g,
+      (m, pre, env) => pre + '$$' + env + '$$');
+    // "$ x^2 $" → "$x^2$" so the delimiters hug the formula
+    out = out.replace(/\$\$\s+([\s\S]*?)\s+\$\$/g, '$$$$$1$$$$');
+    out = out.replace(/\$[ \t]+([^$\n]*?)[ \t]+\$/g, '$$$1$$');
+    return out;
+  };
+
+  // Delimiters recognised when splitting: $$…$$, $…$, \[…\], \(…\), and bare
+  // environments. Kept in one place so repairLatex and splitMath agree.
+  const MATH_SPAN = new RegExp(
+    '\\$\\$([\\s\\S]+?)\\$\\$' +                       // $$ … $$
+    '|\\\\\\[([\\s\\S]+?)\\\\\\]' +                    // \[ … \]
+    '|\\\\\\(([\\s\\S]+?)\\\\\\)' +                    // \( … \)
+    '|\\\\begin\\{([a-zA-Z]+\\*?)\\}([\\s\\S]+?)\\\\end\\{\\4\\}' +  // \begin{env} … \end{env}
+    '|\\$([^$\\n]+?)\\$',                              // $ … $
+    'g');
+
+  /**
+   * Split note text into renderable pieces: {type:'text'|'math', value, display}.
+   * The renderer walks this; nothing here touches the DOM so it stays testable.
+   */
+  NN.splitMath = function (s) {
+    const out = [];
+    const src = String(s || '');
+    MATH_SPAN.lastIndex = 0;
+    let last = 0, m;
+    while ((m = MATH_SPAN.exec(src))) {
+      if (m.index > last) out.push({ type: 'text', value: src.slice(last, m.index) });
+      let value, display;
+      if (m[1] != null) { value = m[1]; display = true; }            // $$
+      else if (m[2] != null) { value = m[2]; display = true; }       // \[
+      else if (m[3] != null) { value = m[3]; display = false; }      // \(
+      else if (m[5] != null) { value = m[0]; display = true; }       // whole environment
+      else { value = m[6]; display = false; }                        // $
+      out.push({ type: 'math', value: String(value).trim(), display });
+      last = m.index + m[0].length;
+    }
+    if (last < src.length) out.push({ type: 'text', value: src.slice(last) });
+    return out;
+  };
+
+  /**
+   * The one call the UI makes: take whatever was highlighted — rendered math,
+   * raw LaTeX from a PDF, or Unicode glyphs — and return text whose formulas are
+   * standard LaTeX between $…$. Safe to run repeatedly.
+   */
+  NN.toStandardMath = function (s) {
+    const repaired = NN.repairLatex(s);
+    // Unicode glyphs only get converted where no delimiters exist yet
+    return NN.hasMath(repaired) ? repaired : NN.autoMath(repaired);
+  };
+
   const TRACKERS = /^(utm_|fbclid$|gclid$|mc_eid$|mc_cid$|igshid$|ref_src$|s_cid$|yclid$|_hs)/i;
 
   /** Strip hash + tracking params so the same page always yields one key. */

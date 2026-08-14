@@ -45,3 +45,4 @@ desktop.ini
 .env.*
 secrets.json
 *.local
+node_modules/

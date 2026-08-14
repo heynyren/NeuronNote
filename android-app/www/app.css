@@ -1,9 +1,17 @@
 :root {
   --paper:#F4F4F0; --card:#FBFBF8; --ink:#191C22; --muted:#6C7079; --line:#DCDDD5;
   --signal:#007D7A; --signal-soft:#E2EFEE; --mark:#FFD75E; --danger:#A3352A;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sans: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
-  --serif: Georgia, "Times New Roman", serif;
+  /* Vietnamese/Japanese-safe stacks. Fonts are matched per character, so a face
+     without the Vietnamese tone marks (U+1EA0–U+1EF9) makes "ệ ộ ữ" fall through
+     mid-word and the line goes ragged — Georgia did exactly that. On Android the
+     WebView resolves system-ui/Roboto for Latin and Noto Sans CJK JP for kana. */
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Roboto Mono",
+          "Noto Sans Mono", "Noto Sans Mono CJK JP", monospace;
+  --sans: system-ui, -apple-system, Roboto, "Segoe UI Variable Text", "Segoe UI",
+          "Noto Sans", "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans",
+          "Yu Gothic UI", sans-serif;
+  --serif: ui-serif, "New York", "Noto Serif", Cambria, "Times New Roman",
+           "Noto Serif CJK JP", "Noto Serif JP", "Hiragino Mincho ProN", serif;
   --amber:#FFE59E; --mint:#B7EBD8; --sky:#BFDDFA; --rose:#FBC9D2; --lilac:#DCD1FA;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bot: env(safe-area-inset-bottom, 0px);

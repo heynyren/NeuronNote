@@ -1,8 +1,15 @@
 :root {
   --paper:#F4F4F0; --ink:#191C22; --muted:#6C7079; --line:#DCDDD5; --signal:#007D7A;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --sans: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --serif: Georgia, "Times New Roman", serif;
+  /* Same Vietnamese/Japanese-safe stacks as notes.css — see the note there. */
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Consolas,
+          "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono",
+          "BIZ UDGothic", "Noto Sans Mono CJK JP", monospace;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+          "Segoe UI", Roboto, "Noto Sans", Arial,
+          "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", Meiryo, sans-serif;
+  --serif: ui-serif, "New York", Cambria, Constantia, "Noto Serif",
+           "Times New Roman", "Hiragino Mincho ProN", "Yu Mincho",
+           "Noto Serif JP", serif;
 }
 * { box-sizing: border-box; }
 body {

@@ -130,6 +130,15 @@ async function captureAndSave(tab, fallbackText, label) {
     const note = {
       id: NN.uid(),
       text: NN.squash(cap.text),
+      // Same passage with formulas as standard LaTeX. Rendered math comes back
+      // from the page as `cap.rich`; otherwise the selection may still hold raw
+      // LaTeX (PDF and chat exports) or Unicode glyphs, which toStandardMath
+      // repairs. Stored only when it differs, so plain prose carries no copy.
+      rich: (function () {
+        const src = NN.squash(cap.rich || cap.text);
+        const std = NN.toStandardMath(src);
+        return std && std !== NN.squash(cap.text) ? std : '';
+      })(),
       note: '',
       tags: label ? [label] : [],
       color: labelColor || settings.markColor || 'amber',
@@ -251,11 +260,21 @@ async function syncNow() {
   syncing = true;
   try {
     const local = await NN.getNotes();
+    // Attachments stay on this machine: the whole note set goes up as ONE JSON
+    // document, so shipping file descriptors would only promise other devices
+    // blobs they cannot resolve. Strip them on the way out and put the local
+    // ones back after the merge.
+    const outgoing = {};
+    Object.keys(local).forEach(id => {
+      const n = local[id];
+      if (n && n.files) { outgoing[id] = Object.assign({}, n); delete outgoing[id].files; }
+      else outgoing[id] = n;
+    });
     const res = await fetch(s.syncUrl, {
       method: 'POST',
       // text/plain to avoid Apps Script's CORS preflight
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'sync', key: s.syncKey || '', notes: local })
+      body: JSON.stringify({ action: 'sync', key: s.syncKey || '', notes: outgoing })
     });
     const raw = await res.text();
     let data;
@@ -269,6 +288,14 @@ async function syncNow() {
     // Newest-wins merge keeps the in-flight change because its updatedAt is newer.
     const freshLocal = await NN.getNotes();
     const merged = NN.merge(freshLocal, data.notes || {});
+    // A remote copy that won the merge carries no files field — restore ours so a
+    // sync never drops attachments that only exist here.
+    Object.keys(freshLocal).forEach(id => {
+      const mine = freshLocal[id];
+      if (mine && mine.files && mine.files.length && merged.notes[id] && !merged.notes[id].files) {
+        merged.notes[id] = Object.assign({}, merged.notes[id], { files: mine.files });
+      }
+    });
     await NN.setNotes(merged.notes);
     const now = Date.now();
     await NN.saveSettings({ lastSync: now });

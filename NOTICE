@@ -31,3 +31,9 @@ redistribute the source code under the AGPL, but you may not use the "Neuron
 Note" name or logo to name, brand, or promote your own distribution or a
 derivative product in a way that could imply it is the original or is endorsed
 by the author. Please use your own name and branding for forks.
+
+---
+
+This product bundles KaTeX (https://katex.org), version 0.16.11,
+which is available under the MIT License. The full license text is
+included at neuron-note/vendor/katex/LICENSE.
