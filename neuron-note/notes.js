@@ -135,6 +135,30 @@
       : `<span class="ldot muted"></span>`;
   }
 
+  /* ---------- math ----------
+     Escape the prose, hand the formulas to KaTeX. KaTeX builds its own markup so
+     its output goes in unescaped; every other piece is escaped as usual. A
+     formula KaTeX rejects falls back to its LaTeX source rather than vanishing. */
+  function mathHtml(s) {
+    const src = String(s || '');
+    if (!src) return '';
+    const parts = NN.splitMath(src);
+    if (!window.katex || !parts.some(p => p.type === 'math')) return esc(src);
+    return parts.map(p => {
+      if (p.type === 'text') return esc(p.value);
+      try {
+        return katex.renderToString(p.value, {
+          displayMode: p.display, throwOnError: false, output: 'html'
+        });
+      } catch (e) {
+        return `<code class="tex-raw">${esc(p.value)}</code>`;
+      }
+    }).join('');
+  }
+
+  /** The passage to show: the LaTeX copy when the page had formulas, else the plain text. */
+  function bodyOf(n) { return n.rich || n.text || ''; }
+
   function pickerHtml(n) {
     const have = new Set(n.tags || []);
     const defined = state.settings.labels || [];
@@ -183,8 +207,8 @@
     return `
     <article class="note${hasNote ? ' has-note' : ''}" data-id="${esc(n.id)}" data-color="${esc(n.color || 'amber')}">
       <div class="card-note">
-        <blockquote class="quote">${esc(n.text)}</blockquote>
-        ${NN.squash(n.note) ? `<p class="mynote">${esc(n.note)}</p>` : ''}
+        <blockquote class="quote">${mathHtml(bodyOf(n))}</blockquote>
+        ${NN.squash(n.note) ? `<p class="mynote">${mathHtml(n.note)}</p>` : ''}
         ${tags ? `<div class="tagrow">${tags}</div>` : ''}
         <div class="editor">
           <textarea placeholder="Your note…">${esc(n.note || '')}</textarea>
@@ -343,6 +367,29 @@
         break;
     }
   });
+
+
+  /* ---------- paste: repair formulas on the way in ----------
+     Text pasted out of a PDF or a chat export carries raw LaTeX ("$\\ge 8mm^2$"),
+     Unicode glyphs ("x²"), or near-miss delimiters. Normalise it as it lands so
+     the note renders instead of showing source. Only rewrites when the filter
+     actually changed something, and the plain paste is left alone otherwise. */
+  function handleMathPaste(e) {
+    const ta = e.target;
+    if (!ta || ta.tagName !== 'TEXTAREA' || !e.clipboardData) return;
+    const raw = e.clipboardData.getData('text/plain');
+    if (!raw) return;
+    const fixed = NN.toStandardMath(raw);
+    if (fixed === raw) return;                 // nothing to repair — let the browser paste
+    e.preventDefault();
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.slice(0, start) + fixed + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + fixed.length;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    toast('Formulas normalised to LaTeX');
+  }
+  $('#list').addEventListener('paste', handleMathPaste);
+  $('#studyStage').addEventListener('paste', handleMathPaste);
 
   function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
@@ -741,10 +788,10 @@
     $('#studyStage').innerHTML = `
       <div class="study-card" data-color="${esc(n.color || 'amber')}">
         <div class="st-meta">${esc(NN.hostOf(n.url))} · level ${s.box || 0} · reviewed ${s.reps || 0} times</div>
-        <blockquote class="st-quote">${esc(n.text)}</blockquote>
+        <blockquote class="st-quote">${mathHtml(bodyOf(n))}</blockquote>
         ${tags ? `<div class="st-tags">${tags}</div>` : ''}
         <div class="st-reveal" hidden>
-          ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
+          ${NN.squash(n.note) ? `<p class="st-note">${mathHtml(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
           <a class="st-open" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">Open source passage ↗</a>
         </div>
         <div class="st-edit" hidden>
@@ -931,6 +978,9 @@
   $('#btnStudy').addEventListener('click', openStudy);
   $('#studyClose').addEventListener('click', closeStudy);
   $('#studyFinish').addEventListener('click', closeStudy);
+
+  // Test hook for the jsdom suite (same idea as window.__NN_APP__ in the Android app).
+  window.__NN_MATH__ = mathHtml;
 
   /* ---------- startup ---------- */
   chrome.storage.onChanged.addListener(ch => {

@@ -433,3 +433,19 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------- công thức (KaTeX) ---------- */
+/* A long formula must scroll inside its own box instead of stretching the card. */
+.quote .katex-display, .st-quote .katex-display,
+.mynote .katex-display, .st-note .katex-display {
+  overflow-x: auto; overflow-y: hidden; padding: 2px 0; margin: .5em 0;
+}
+.katex { font-size: 1.05em; }
+.st-quote .katex { font-size: 1em; }
+/* KaTeX renders upright; the passage around it is italic serif, so undo the slant. */
+.quote .katex, .st-quote .katex { font-style: normal; }
+/* LaTeX that KaTeX could not parse — show the source rather than dropping it. */
+.tex-raw {
+  font: 12px var(--mono); background: #F0EFE8; border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 5px; color: var(--danger); font-style: normal;
+}
