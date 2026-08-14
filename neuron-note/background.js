@@ -130,6 +130,15 @@ async function captureAndSave(tab, fallbackText, label) {
     const note = {
       id: NN.uid(),
       text: NN.squash(cap.text),
+      // Same passage with formulas as standard LaTeX. Rendered math comes back
+      // from the page as `cap.rich`; otherwise the selection may still hold raw
+      // LaTeX (PDF and chat exports) or Unicode glyphs, which toStandardMath
+      // repairs. Stored only when it differs, so plain prose carries no copy.
+      rich: (function () {
+        const src = NN.squash(cap.rich || cap.text);
+        const std = NN.toStandardMath(src);
+        return std && std !== NN.squash(cap.text) ? std : '';
+      })(),
       note: '',
       tags: label ? [label] : [],
       color: labelColor || settings.markColor || 'amber',

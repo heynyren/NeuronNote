@@ -43,6 +43,78 @@
     return !!(el && el.closest && el.closest(SKIP_SEL));
   }
 
+  /* ---------- LaTeX capture ----------
+     A rendered formula is a pile of positioned spans; reading its text back gives
+     mangled glyph soup. Both KaTeX and MathJax keep the author's original TeX in a
+     hidden <annotation encoding="application/x-tex">, and Wikipedia keeps it in the
+     image's alt text, so pull the real source from there instead. */
+  const MATH_SEL = '.katex, mjx-container, .MathJax, .mjx-chtml, math, ' +
+    'img.mwe-math-fallback-image-inline, img.mwe-math-fallback-image-display, [data-latex]';
+
+  /** The TeX source of a rendered-math element, or '' when it carries none. */
+  function texOf(el) {
+    if (!el) return '';
+    if (el.tagName === 'IMG') return String(el.getAttribute('alt') || '').trim();
+    if (el.hasAttribute && el.hasAttribute('data-latex')) return String(el.getAttribute('data-latex')).trim();
+    const ann = el.querySelector && el.querySelector('annotation[encoding="application/x-tex"]');
+    if (ann) return String(ann.textContent || '').trim();
+    // MathJax v2 leaves the source in a sibling <script type="math/tex">
+    const scr = el.parentElement && el.parentElement.querySelector('script[type^="math/tex"]');
+    if (scr) return String(scr.textContent || '').trim();
+    return '';
+  }
+
+  /** Is this formula its own block (display math) rather than inline? */
+  function isDisplayMath(el) {
+    if (el.classList && (el.classList.contains('katex-display') || el.classList.contains('mwe-math-fallback-image-display'))) return true;
+    if (el.closest && el.closest('.katex-display')) return true;
+    if (el.getAttribute && el.getAttribute('display') === 'true') return true;   // mjx-container
+    if (el.tagName === 'MATH' && el.getAttribute('display') === 'block') return true;
+    return false;
+  }
+
+  /** Outermost math element containing node, so nested .katex inside mjx isn't doubled. */
+  function mathRootOf(node) {
+    const el = node.nodeType === 3 ? node.parentElement : node;
+    if (!el || !el.closest) return null;
+    let hit = el.closest(MATH_SEL);
+    if (!hit) return null;
+    let up = hit.parentElement && hit.parentElement.closest(MATH_SEL);
+    while (up) { hit = up; up = hit.parentElement && hit.parentElement.closest(MATH_SEL); }
+    return hit;
+  }
+
+  /**
+   * Read a Range as text with formulas kept as LaTeX ($…$ / $$…$$). Used only for
+   * the stored `rich` copy — `text` stays glyph-for-glyph identical to the page so
+   * re-highlighting keeps working.
+   */
+  function richTextOfRange(range) {
+    let holder;
+    try {
+      holder = document.createElement('div');
+      holder.appendChild(range.cloneContents());
+    } catch (e) { return ''; }
+
+    // Replace each formula subtree with a plain-text placeholder carrying its TeX.
+    const seen = new Set();
+    holder.querySelectorAll(MATH_SEL).forEach(el => {
+      // holder is detached, so isConnected is always false here — ask holder instead
+      if (!holder.contains(el) || seen.has(el)) return;
+      if (el.parentElement && el.parentElement.closest(MATH_SEL)) return;  // nested — outer wins
+      const tex = texOf(el);
+      if (!tex) return;
+      el.querySelectorAll(MATH_SEL).forEach(c => seen.add(c));
+      const mark = isDisplayMath(el) ? '$$' + tex + '$$' : '$' + tex + '$';
+      const span = document.createElement('span');
+      span.textContent = ' ' + mark + ' ';
+      el.replaceWith(span);
+    });
+
+    const out = makeIndex(holder).norm;
+    return out ? squash(out) : '';
+  }
+
   function acceptTextNode(n) {
     const p = n.parentElement;
     if (!p) return NodeFilter.FILTER_REJECT;
@@ -692,9 +764,13 @@
     let text = squash(textOfRange(range));
     if (!text) text = squash(sel.toString());
     if (!text) return null;
+    // A second copy with formulas as LaTeX. Only kept when it actually differs,
+    // so ordinary passages don't carry a redundant duplicate around.
+    const rich = richTextOfRange(range);
     const ctx = contextAround(range);
     return {
       text,
+      rich: rich && rich !== text ? rich : '',
       prefix: ctx.prefix,
       suffix: ctx.suffix,
       title: document.title,
@@ -751,6 +827,10 @@
         sendResponse({ ok: false });
     }
   });
+
+  // Test hook, mirroring window.__NN_APP__ in the Android app: lets the jsdom
+  // suite drive the LaTeX capture without a browser.
+  window.__NN_TEST__ = { richTextOfRange, texOf, isDisplayMath };
 
   /* ================= startup ================= */
   if (document.readyState === 'loading') {
