@@ -10,8 +10,8 @@ Select any passage on a page → save it under a label, with a link that jumps y
 straight back to the exact spot → review it right before you'd forget, with
 **spaced repetition**. Syncs between desktop and phone through your own Google Drive.
 
-![Version](https://img.shields.io/badge/extension-v1.4.1-6c5ce7)
-![Android](https://img.shields.io/badge/android-v1.0.1-2ecc71)
+![Version](https://img.shields.io/badge/extension-v1.6.0-6c5ce7)
+![Android](https://img.shields.io/badge/android-v1.1.0-2ecc71)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20%7C%20Android-lightgrey)
 
@@ -44,6 +44,9 @@ We read great things on the web and forget almost all of them. Neuron Note turns
 
 - 🏷️ **Google-Keep-style labels** — one passage can carry many labels; filter by AND/OR.
 - 🔁 **Study mode** — spaced repetition, keyboard shortcuts, snooze / mark-as-mastered.
+- 📈 **Progress & rewards** — a daily goal, a streak of days in a row, a 17-week heat
+  calendar and 23 badges, the same idea as the Denken 3 Shuu study app. Progress syncs
+  between desktop and phone alongside your passages.
 - 🔗 **Precise re-anchoring** — uses the browser's native *text fragment* standard, so a
   link jumps to the right place even for people who don't have the extension.
 - ∑ **Understands math** — recognizes KaTeX/MathJax formulas (e.g. content from Gemini).

@@ -157,6 +157,7 @@
       NN.putNote(next).then(() => {
         state.notes[id] = next; renderAll();
         toast((act === 'grade-yes' ? 'Got it → level ' : 'Not yet → level ') + next.srs.box + ' · ' + dueLabel(next.srs.due));
+        logReview(act === 'grade-yes');
         autoSync();
       });
       return;
@@ -274,7 +275,18 @@
     const after = (o.newLabels && o.newLabels.length)
       ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, o.newLabels) }).then(s => { state.settings = s; })
       : Promise.resolve();
-    return after.then(() => NN.putNote(note)).then(() => { state.notes[note.id] = note; renderAll(); autoSync(); return note; });
+    return after.then(() => NN.putNote(note)).then(() => {
+      state.notes[note.id] = note;
+      renderAll();
+      // Count the day's new passages for the Progress panel. A failure here must
+      // never take the save down with it — the passage matters, the tally doesn't.
+      NN.recordSaved(1, progressStats).then(ids => {
+        updateStreakPill();
+        if (ids.length) NN.celebrateBadges(ids);
+      }).catch(() => {});
+      autoSync();
+      return note;
+    });
   }
 
   /* ---------------- EDITOR ---------------- */
@@ -405,7 +417,9 @@
       const next = Object.assign({}, n); NN.grade(next, act === 'yes');
       state.study.done += 1;
       NN.putNote(next).then(() => { state.notes[next.id] = next; autoSync(); });
-      advance();
+      // Hold the next card back until the congratulations box is dismissed —
+      // otherwise the popup covers a card you are already grading.
+      logReview(act === 'yes', advance);
       return;
     }
     if (act === 'hide' || act === 'known') {
@@ -523,17 +537,25 @@
     if (syncing) return Promise.resolve();
     syncing = true;
     toast('Syncing…');
-    return NN.getNotes().then(local =>
-      nnPost(s.syncUrl, { action: 'sync', key: s.syncKey || '', notes: local }).then(data => {
+    return Promise.all([NN.getNotes(), NN.getProgress()]).then(pair =>
+      nnPost(s.syncUrl, { action: 'sync', key: s.syncKey || '', notes: pair[0], progress: pair[1] }).then(data => {
         if (!data || !data.ok) throw new Error((data && data.error) || 'Server error');
         // Re-read local right before merging so a grade/edit made *during* the
         // slow network round-trip isn't clobbered by the stale snapshot we sent
         // (e.g. a "Got it" bumping level 0→1 would otherwise revert to 0).
         return NN.getNotes().then(freshLocal => {
           const m = NN.merge(freshLocal, data.notes || {});
-          return NN.setNotes(m.notes).then(() => NN.saveSettings({ lastSync: Date.now() })).then(() => {
-            return load().then(() => toast('Synced · ' + NN.live(m.notes).length + ' passages'));
-          });
+          return NN.setNotes(m.notes)
+            // Progress merges by its own rule (see NN.mergeProgress): counts take
+            // the larger side rather than the newer one, so reviews done on the
+            // phone and on the laptop on the same day both survive. A server not
+            // yet updated returns nothing here and the local record stands.
+            .then(() => (data.progress
+              ? NN.getProgress().then(mine => NN.setProgress(NN.mergeProgress(mine, data.progress)))
+              : null))
+            .then(() => NN.saveSettings({ lastSync: Date.now() }))
+            .then(() => load())
+            .then(() => toast('Synced · ' + NN.live(m.notes).length + ' passages'));
         });
       })
     ).catch(err => { toast('Sync error: ' + (err.message || err)); }).then(() => { syncing = false; });
@@ -611,6 +633,53 @@
     Capacitor.Plugins.App.addListener('appStateChange', st => { if (st && st.isActive) checkIncoming(); });
   }
 
+  /* ---------------- PROGRESS & REWARDS ---------------- */
+
+  /** The note-side numbers the badges need (see NN.noteStats). */
+  function progressStats() { return Promise.resolve(NN.noteStats(state.notes)); }
+
+  const progressIo = {
+    get: () => NN.getProgress(),
+    save: (fn) => NN.updateProgress(fn),
+    stats: progressStats
+  };
+
+  /**
+   * Record one graded review and, if it unlocked anything, show it.
+   * @param {boolean} ok      whether the answer was "got it"
+   * @param {Function} [then] runs once any celebration is dismissed
+   */
+  function logReview(ok, then) {
+    NN.recordReview(ok, progressStats).then(ids => {
+      updateStreakPill();
+      if (state.tab === 'prog') drawProgress();
+      if (ids.length) NN.celebrateBadges(ids, then);
+      else if (then) then();
+    }).catch(() => { if (then) then(); });
+  }
+
+  /** Re-check badges that depend only on the notebook's size, not on grading. */
+  function checkPassiveBadges() {
+    NN.checkBadges(progressStats).then(ids => {
+      updateStreakPill();
+      if (ids.length) NN.celebrateBadges(ids);
+    }).catch(() => {});
+  }
+
+  /** Streak on the Progress screen's header, so it greets you on arrival. */
+  function updateStreakPill() {
+    return NN.getProgress().then(raw => {
+      const view = NN.progressOverview(NN.normalizeProgress(raw), {});
+      const pill = $('#progStreak');
+      if (pill) {
+        pill.textContent = (view.streak.current ? view.streak.current + '-day streak · ' : '')
+          + view.today.reviews + '/' + view.goal + ' today';
+      }
+    }).catch(() => {});
+  }
+
+  function drawProgress() { return NN.renderProgress($('#progressBody'), progressIo); }
+
   /* ---------------- TABS ---------------- */
   function switchTab(tab) {
     state.tab = tab;
@@ -618,6 +687,7 @@
     $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
     if (tab === 'study') openStudy();
     if (tab === 'add') renderAddPicker();
+    if (tab === 'prog') { updateStreakPill(); drawProgress(); }
   }
   $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -630,6 +700,8 @@
   if (AppPlugin) {
     AppPlugin.addListener('backButton', () => {
       // 1) A modal sheet is open → close it (same as tapping its ✕ / the backdrop).
+      const cel = document.getElementById('pgCelebrate');
+      if (cel && !cel.hidden) { cel.hidden = true; return; }
       if (!$('#setSheet').hidden) { saveSettingsClose(); return; }
       if (!$('#editSheet').hidden) { $('#editSheet').hidden = true; return; }
       // 2) Not on the main library screen → go back to it instead of exiting.
@@ -640,7 +712,13 @@
   }
 
   /* ---------------- STARTUP ---------------- */
-  load().then(() => { checkIncoming(); });
+  load().then(() => {
+    checkIncoming();
+    updateStreakPill();
+    // Some milestones depend only on how big the notebook is, and it can grow
+    // from the desktop extension — which never passes through grading here.
+    checkPassiveBadges();
+  });
 
   // expose for tests
   window.__NN_APP__ = { state, load, saveNewNote, switchTab, checkIncoming, syncNow, openStudy, mobileFragUrl };

@@ -406,6 +406,7 @@
           state.notes[id] = next;
           render();
           toast((ok ? 'Got it → level ' + next.srs.box : 'Not yet → level ' + next.srs.box) + ' · ' + dueLabel(next.srs.due));
+          logReview(ok);
           autoSync();
         });
         break;
@@ -810,7 +811,11 @@
   $('#btnSettings').addEventListener('click', openSheet);
   $('#sheetClose').addEventListener('click', () => { $('#sheet').hidden = true; });
   $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') $('#sheet').hidden = true; });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#sheet').hidden = true; });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    $('#sheet').hidden = true;
+    closeProgress();
+  });
 
   $('#sheetSave').addEventListener('click', () => {
     NN.saveSettings({
@@ -885,6 +890,74 @@
     clearTimeout(tt);
     tt = setTimeout(() => { el.hidden = true; }, 2600);
   }
+
+  /* ---------- progress & rewards ---------- */
+
+  /** The note-side numbers the badges need (see NN.noteStats). */
+  function progressStats() { return Promise.resolve(NN.noteStats(state.notes)); }
+
+  const progressIo = {
+    get: () => NN.getProgress(),
+    save: (fn) => NN.updateProgress(fn),
+    stats: progressStats
+  };
+
+  /**
+   * Record one graded review and, if it unlocked anything, show it.
+   * @param {boolean} ok    whether the answer was "got it"
+   * @param {Function} [then] runs once any celebration is dismissed
+   */
+  function logReview(ok, then) {
+    NN.recordReview(ok, progressStats).then(ids => {
+      updateStreakPill();
+      if (!$('#progressSheet').hidden) drawProgress();
+      if (ids.length) NN.celebrateBadges(ids, then);
+      else if (then) then();
+    }).catch(() => { if (then) then(); });
+  }
+
+  /** Re-check badges that depend only on the notebook's size, not on grading. */
+  function checkPassiveBadges() {
+    NN.checkBadges(progressStats).then(ids => {
+      updateStreakPill();
+      if (ids.length) NN.celebrateBadges(ids);
+    }).catch(() => {});
+  }
+
+  /**
+   * The streak lives on the Progress button itself.
+   *
+   * The rail is on screen the whole time you are reading, so a number there is
+   * seen dozens of times a day without opening anything — which is exactly when
+   * a streak does its job of reminding you.
+   */
+  function updateStreakPill() {
+    NN.getProgress().then(raw => {
+      const view = NN.progressOverview(NN.normalizeProgress(raw), {});
+      const btn = $('#btnProgress');
+      if (!btn) return;
+      btn.textContent = view.streak.current
+        ? 'Progress · ' + view.streak.current + 'd'
+        : 'Progress';
+      btn.title = view.today.met
+        ? "Today's goal is done"
+        : view.today.reviews + ' of ' + view.goal + ' reviews today';
+    }).catch(() => {});
+  }
+
+  function drawProgress() { return NN.renderProgress($('#progressBody'), progressIo); }
+
+  function openProgress() {
+    $('#progressSheet').hidden = false;
+    drawProgress();
+  }
+  function closeProgress() { $('#progressSheet').hidden = true; }
+
+  $('#btnProgress').addEventListener('click', openProgress);
+  $('#progressClose').addEventListener('click', closeProgress);
+  $('#progressSheet').addEventListener('click', e => {
+    if (e.target.id === 'progressSheet') closeProgress();
+  });
 
   /* ---------- study mode (SRS) ---------- */
   const study = { queue: [], i: 0, revealed: false, done: 0 };
@@ -1081,7 +1154,9 @@
       NN.grade(next, act === 'yes');
       study.done += 1;
       NN.putNote(next).then(() => { state.notes[next.id] = next; autoSync(); });
-      advance();
+      // Hold the next card back until the congratulations box is dismissed —
+      // otherwise the popup covers a card you are already grading.
+      logReview(act === 'yes', advance);
       return;
     }
     if (act === 'hide' || act === 'known') {
@@ -1156,5 +1231,11 @@
     if (location.hash === '#settings' || location.hash === '#labels') openSheet();
     if (location.hash === '#labels') setTimeout(() => $('#newLabelName') && $('#newLabelName').focus(), 80);
     if (location.hash === '#study') setTimeout(openStudy, 60);
+    if (location.hash === '#progress') openProgress();
+    updateStreakPill();
+    // Some milestones depend only on how big the notebook is, and it can grow
+    // from the phone or from a right-click save — neither of which passes
+    // through grading. So re-check once on open.
+    checkPassiveBadges();
   });
 })();

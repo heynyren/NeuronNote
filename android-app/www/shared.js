@@ -222,21 +222,26 @@
   NN.getAll = function () {
     return rawGet().then(data => ({
       notes: (data && data.notes) || {},
-      settings: Object.assign({}, NN.DEFAULT_SETTINGS, (data && data.settings) || {})
+      settings: Object.assign({}, NN.DEFAULT_SETTINGS, (data && data.settings) || {}),
+      progress: (data && data.progress) || null
     }));
   };
 
   NN.getNotes = function () { return NN.getAll().then(r => r.notes); };
   NN.getSettings = function () { return NN.getAll().then(r => r.settings); };
 
+  // Everything shares one blob under a single key, so each writer has to carry
+  // the other fields through untouched — otherwise saving a note would quietly
+  // wipe the progress record, and vice versa.
   NN.setNotes = function (notes) {
-    return NN.getAll().then(all => rawSet({ notes, settings: all.settings }).then(() => notes));
+    return NN.getAll().then(all =>
+      rawSet({ notes, settings: all.settings, progress: all.progress }).then(() => notes));
   };
 
   NN.saveSettings = function (patch) {
     return NN.getAll().then(all => {
       const next = Object.assign({}, all.settings, patch);
-      return rawSet({ notes: all.notes, settings: next }).then(() => next);
+      return rawSet({ notes: all.notes, settings: next, progress: all.progress }).then(() => next);
     });
   };
 
@@ -257,6 +262,113 @@
       };
       return NN.setNotes(notes);
     });
+  };
+
+
+  NN.getProgress = function () {
+    return rawGet().then(function (data) { return (data && data.progress) || null; });
+  };
+  NN.setProgress = function (d) {
+    return rawGet().then(function (data) {
+      return rawSet({
+        notes: (data && data.notes) || {},
+        settings: (data && data.settings) || {},
+        progress: d
+      });
+    });
+  };
+
+
+  /* ---------- progress tracking (model & rendering live in progress.js) ----------
+     Stored apart from the notes: it is a single small record that changes on a
+     different rhythm (once per graded card) and merges by a different rule
+     (larger count wins, not newer timestamp). Folding it into the notes map
+     would put it through the notes' newest-wins merge and lose reviews. */
+
+  /** Read-modify-write the progress record in one hop. */
+  NN.updateProgress = function (fn) {
+    return NN.getProgress().then(function (cur) {
+      var next = fn(cur) || cur;
+      return NN.setProgress(next).then(function () { return next; });
+    });
+  };
+
+  /** Today's bucket in the log, created on demand. */
+  function todayBucket(d) {
+    var iso = NN.pDay();
+    if (!d.log[iso]) d.log[iso] = { r: 0, y: 0, n: 0, s: 0, dawn: 0, night: 0 };
+    return d.log[iso];
+  }
+
+  /**
+   * Record one graded review.
+   *
+   * Both answers count. Grading "not yet" costs the same effort as grading
+   * "got it", and only counting the wins would quietly push people to mark
+   * things known that they do not know.
+   *
+   * @returns {Promise<string[]>} ids of badges unlocked by this review
+   */
+  NN.recordReview = function (ok, stats) {
+    return NN.updateProgress(function (cur) {
+      var d = NN.normalizeProgress(cur);
+      var t = todayBucket(d);
+      t.r += 1;
+      if (ok) t.y += 1; else t.n += 1;
+      var hour = new Date().getHours();
+      if (hour < 6) t.dawn = 1;
+      if (hour >= 23) t.night = 1;
+      return d;
+    }).then(function () { return NN.checkBadges(stats); });
+  };
+
+  /** Record newly saved passages (only brand-new ones, not re-saves). */
+  NN.recordSaved = function (count, stats) {
+    return NN.updateProgress(function (cur) {
+      var d = NN.normalizeProgress(cur);
+      todayBucket(d).s += (count || 1);
+      return d;
+    }).then(function () { return NN.checkBadges(stats); });
+  };
+
+  /**
+   * Re-evaluate every badge and store the ones just unlocked.
+   * Worth calling on start-up too: some milestones depend only on how many
+   * passages are in the notebook, which can grow from another device.
+   */
+  NN.checkBadges = function (stats) {
+    return Promise.all([NN.getProgress(), stats ? stats() : {}]).then(function (r) {
+      var d = NN.normalizeProgress(r[0]);
+      var view = NN.progressOverview(d, r[1] || {});
+      var fresh = NN.newlyEarnedBadges(view, d.badges, NN.pDay());
+      var ids = Object.keys(fresh);
+      if (!ids.length) return [];
+      Object.keys(fresh).forEach(function (id) { d.badges[id] = fresh[id]; });
+      return NN.setProgress(d).then(function () { return ids; });
+    });
+  };
+
+  /** The numbers the badges need that only the notes themselves can answer. */
+  NN.noteStats = function (notes) {
+    var live = NN.live(notes);
+    var now = Date.now();
+    var out = { total: live.length, longTerm: 0, annotated: 0, due: 0, studying: 0 };
+    var labels = {}, sites = {};
+    live.forEach(function (n) {
+      var s = n.srs || {};
+      // Box 4 is the 14-day interval — the point where a passage has plausibly
+      // moved into long-term memory rather than being freshly crammed.
+      if ((s.box || 0) >= 4) out.longTerm += 1;
+      if (n.note && String(n.note).trim()) out.annotated += 1;
+      if (NN.inStudy(n)) out.studying += 1;
+      if (NN.isDue(n, now)) out.due += 1;
+      (n.tags || []).forEach(function (t) { labels[t] = 1; });
+      var h = NN.hostOf(n.url);
+      if (h) sites[h] = 1;
+    });
+    out.labels = Object.keys(labels).length;
+    out.sources = Object.keys(sites).length;
+    return out;
   };
 
   NN.live = function (notes) {

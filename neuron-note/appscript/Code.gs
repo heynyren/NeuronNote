@@ -46,17 +46,21 @@ function doPost(e) {
     var stored = readStore();
 
     if (action === 'pull') {
-      return json({ ok: true, notes: stored, at: Date.now() });
+      return json({ ok: true, notes: stored.notes, progress: stored.progress, at: Date.now() });
     }
 
-    var merged = merge(stored, req.notes || {});
-    writeStore(merged);
+    var merged = merge(stored.notes, req.notes || {});
+    var mergedProgress = mergeProgress(stored.progress, req.progress);
+    writeStore(merged, mergedProgress);
 
     if (action === 'push') {
       return json({ ok: true, count: countLive(merged), at: Date.now() });
     }
     // 'sync': return everything so both sides match
-    return json({ ok: true, notes: merged, count: countLive(merged), at: Date.now() });
+    return json({
+      ok: true, notes: merged, progress: mergedProgress,
+      count: countLive(merged), at: Date.now()
+    });
 
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -88,6 +92,51 @@ function merge(a, b) {
   return out;
 }
 
+/* ---------- merge: progress (study streak, badges) ----------
+ * NOT the notes' "newer wins" rule. Reviewing 8 passages on the phone and 5 on
+ * the laptop today means both numbers are real, and neither side may erase the
+ * other, so counts take the LARGER value. Summing would be wrong too: once the
+ * two devices have synced, adding would double-count the reviews just received.
+ * Badges are a union keeping the earlier date; the daily goal is last-write-wins.
+ */
+function mergeProgress(a, b) {
+  if (!a && !b) return null;
+  a = a || {}; b = b || {};
+  var out = {
+    v: 1,
+    goal: ((b.goalAt || 0) > (a.goalAt || 0)) ? (b.goal || 15) : (a.goal || 15),
+    goalAt: Math.max(a.goalAt || 0, b.goalAt || 0),
+    log: {},
+    badges: {}
+  };
+
+  var days = {}, id;
+  for (id in (a.log || {})) days[id] = 1;
+  for (id in (b.log || {})) days[id] = 1;
+  for (id in days) {
+    var p = (a.log && a.log[id]) || {};
+    var q = (b.log && b.log[id]) || {};
+    out.log[id] = {
+      r: Math.max(p.r || 0, q.r || 0),
+      y: Math.max(p.y || 0, q.y || 0),
+      n: Math.max(p.n || 0, q.n || 0),
+      s: Math.max(p.s || 0, q.s || 0),
+      dawn: (p.dawn || q.dawn) ? 1 : 0,
+      night: (p.night || q.night) ? 1 : 0
+    };
+  }
+
+  var ids = {};
+  for (id in (a.badges || {})) ids[id] = 1;
+  for (id in (b.badges || {})) ids[id] = 1;
+  for (id in ids) {
+    var mine = a.badges && a.badges[id];
+    var theirs = b.badges && b.badges[id];
+    out.badges[id] = (!mine || (theirs && theirs < mine)) ? theirs : mine;
+  }
+  return out;
+}
+
 function countLive(notes) {
   var n = 0;
   for (var id in notes) if (notes.hasOwnProperty(id) && notes[id] && !notes[id].deleted) n++;
@@ -102,17 +151,26 @@ function getFile() {
   return DriveApp.createFile(FILE_NAME, '{}', MimeType.PLAIN_TEXT);
 }
 
+/**
+ * The file used to be a bare map of notes keyed by id. It is now
+ * { v: 2, notes: {...}, progress: {...} } so study progress can live alongside.
+ * Files written by the old version are still read correctly: anything without a
+ * `v` field is treated as the notes map itself, so upgrading needs no migration
+ * step and no data is lost if you roll back.
+ */
 function readStore() {
   try {
     var txt = getFile().getBlob().getDataAsString('UTF-8');
-    return JSON.parse(txt || '{}');
+    var data = JSON.parse(txt || '{}');
+    if (data && data.v && data.notes) return { notes: data.notes, progress: data.progress || null };
+    return { notes: data || {}, progress: null };
   } catch (err) {
-    return {};
+    return { notes: {}, progress: null };
   }
 }
 
-function writeStore(notes) {
-  getFile().setContent(JSON.stringify(notes));
+function writeStore(notes, progress) {
+  getFile().setContent(JSON.stringify({ v: 2, notes: notes, progress: progress || null }));
 }
 
 function json(obj) {
@@ -160,7 +218,8 @@ function dueList(notes, now) {
 }
 
 function dailyDigest() {
-  var notes = readStore();
+  var store = readStore();
+  var notes = store.notes;
   var now = Date.now();
   var due = dueList(notes, now);
 
@@ -180,6 +239,14 @@ function dailyDigest() {
   lines.push('Good morning!');
   lines.push('');
   lines.push('Due for review: ' + due.length + ' passages  ·  In the study schedule: ' + studying + ' passages.');
+
+  // A streak is a stronger reason to sit down than a due count, so lead with it
+  // when there is one to lose.
+  var streak = currentStreak(store.progress);
+  if (streak > 1) {
+    lines.push('');
+    lines.push('You are on a ' + streak + '-day streak — today keeps it going.');
+  }
   if (due.length) {
     lines.push('');
     lines.push('A few passages to review:');
@@ -209,8 +276,26 @@ function dailyDigest() {
 }
 
 /* ---------- helpers: run by hand in the editor to test ---------- */
+/** Days in a row that met the daily goal, counting back from today (or yesterday
+ *  if today is not done yet, so a streak does not read as broken mid-morning). */
+function currentStreak(p) {
+  if (!p || !p.log) return 0;
+  var goal = Math.max(1, p.goal || 15);
+  var tz = Session.getScriptTimeZone();
+  var day = function (offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + offset);
+    return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+  };
+  var met = function (iso) { return ((p.log[iso] || {}).r || 0) >= goal; };
+  var offset = met(day(0)) ? 0 : -1;
+  var n = 0;
+  while (met(day(offset))) { n++; offset--; }
+  return n;
+}
+
 function testStore() {
-  Logger.log(countLive(readStore()) + ' passages stored on Drive');
+  Logger.log(countLive(readStore().notes) + ' passages stored on Drive');
 }
 function testDigestNow() {   // send a test email now, without waiting for the schedule
   var save = SEND_WHEN_EMPTY; SEND_WHEN_EMPTY = true; dailyDigest(); SEND_WHEN_EMPTY = save;

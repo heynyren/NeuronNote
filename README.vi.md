@@ -10,8 +10,8 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 ôn lại theo **lặp lại ngắt quãng** (spaced repetition). Đồng bộ giữa máy tính và
 điện thoại qua Google Drive.
 
-![Version](https://img.shields.io/badge/extension-v1.4.1-6c5ce7)
-![Android](https://img.shields.io/badge/android-v1.0.1-2ecc71)
+![Version](https://img.shields.io/badge/extension-v1.6.0-6c5ce7)
+![Android](https://img.shields.io/badge/android-v1.1.0-2ecc71)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20%7C%20Android-lightgrey)
 
@@ -42,6 +42,9 @@ Bôi đen một đoạn bất kỳ → lưu theo nhãn, kèm link quay về đú
 
 - 🏷️ **Nhãn kiểu Google Keep** — một đoạn mang nhiều nhãn, lọc AND/OR.
 - 🔁 **Chế độ Học** — spaced repetition, phím tắt, ẩn khỏi học / đánh dấu đã thuộc.
+- 📈 **Tiến độ & phần thưởng** — mục tiêu mỗi ngày, chuỗi ngày liên tiếp, lịch nhiệt
+  17 tuần và 23 huy hiệu, cùng cơ chế với app Denken 3 Shuu. Tiến độ đồng bộ giữa máy
+  tính và điện thoại cùng với các đoạn đã lưu.
 - 🔗 **Neo lại chính xác** — dùng chuẩn *text fragment* của trình duyệt, người khác
   không cài extension mở link vẫn nhảy đúng chỗ.
 - ∑ **Hiểu công thức toán** — nhận diện KaTeX/MathJax (ví dụ nội dung Gemini xuất ra).
