@@ -36,6 +36,8 @@
       state.settings = r.settings;
       render();
       paintSync();
+      // blobs whose note is gone would otherwise sit on disk forever
+      if (window.NNFiles) NNFiles.sweep(state.notes).catch(() => {});
     });
   }
 
@@ -126,6 +128,7 @@
     // list
     $('#empty').hidden = list.length > 0;
     $('#list').innerHTML = list.map(cardHtml).join('');
+    paintFiles($('#list'));
     updateDuePill();
   }
 
@@ -158,6 +161,40 @@
 
   /** The passage to show: the LaTeX copy when the page had formulas, else the plain text. */
   function bodyOf(n) { return n.rich || n.text || ''; }
+
+  /* ---------- attachments ----------
+     Thumbnails resolve asynchronously: the bytes live in IndexedDB, so markup
+     ships a data-thumb id and paintFiles() fills in object URLs once the DOM is
+     in place. */
+  function fileExt(name) {
+    const m = String(name || '').match(/\.([a-z0-9]{1,5})$/i);
+    return (m ? m[1] : 'file').toUpperCase();
+  }
+  function fileChip(f, editable) {
+    const img = NNFiles.isImage(f.type);
+    return `<span class="file-chip${img ? ' is-img' : ''}" data-file="${esc(f.id)}" title="${esc(f.name)} \u00b7 ${NNFiles.formatSize(f.size)}">
+      ${img ? `<img alt="${esc(f.name)}" data-thumb="${esc(f.id)}">` : `<span class="file-ico">${esc(fileExt(f.name))}</span>`}
+      <span class="file-name">${esc(f.name)}</span>
+      <span class="file-size">${NNFiles.formatSize(f.size)}</span>
+      ${editable ? `<button class="file-del" data-act="file-del" data-id="${esc(f.id)}" title="Remove" aria-label="Remove attachment">\u2715</button>` : ''}
+    </span>`;
+  }
+  function filesViewHtml(n) {
+    const fs = n.files || [];
+    return fs.length ? `<div class="files view">${fs.map(f => fileChip(f, false)).join('')}</div>` : '';
+  }
+  function filesEditHtml(n) {
+    return (n.files || []).map(f => fileChip(f, true)).join('');
+  }
+
+  /** Point every data-thumb at its stored blob. */
+  function paintFiles(root) {
+    (root || document).querySelectorAll('img[data-thumb]').forEach(img => {
+      if (img.dataset.painted) return;
+      img.dataset.painted = '1';
+      NNFiles.url(img.dataset.thumb).then(u => { if (u) img.src = u; });
+    });
+  }
 
   function pickerHtml(n) {
     const have = new Set(n.tags || []);
@@ -210,8 +247,18 @@
         <blockquote class="quote">${mathHtml(bodyOf(n))}</blockquote>
         ${NN.squash(n.note) ? `<p class="mynote">${mathHtml(n.note)}</p>` : ''}
         ${tags ? `<div class="tagrow">${tags}</div>` : ''}
+        ${filesViewHtml(n)}
         <div class="editor">
           <textarea placeholder="Your note…">${esc(n.note || '')}</textarea>
+          <label class="editor-lbl">Attachments</label>
+          <div class="files" data-files>
+            ${filesEditHtml(n)}
+            <label class="file-add">
+              <input type="file" multiple hidden>
+              <span>＋ file</span>
+            </label>
+            <span class="file-hint">or paste an image</span>
+          </div>
           <label class="editor-lbl">Labels</label>
           <div class="lbl-picker">${pickerHtml(n)}</div>
           <div class="study-ctl">
@@ -273,6 +320,12 @@
       sw.parentNode.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', String(x === sw)));
       return;
     }
+
+    // attachments: remove, or open in a tab
+    const del = e.target.closest('[data-act="file-del"]');
+    if (del) { detachFile(noteOf(del), del.dataset.id); return; }
+    const chip = e.target.closest('.file-chip');
+    if (chip) { openFile(chip.dataset.file); return; }
 
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
@@ -368,6 +421,104 @@
     }
   });
 
+
+  /* ---------- attachments: pick, paste, drop ----------
+     Files are written to IndexedDB immediately and the descriptor is appended to
+     the note, so an attachment survives even if the editor is cancelled — the
+     alternative (holding blobs in memory until Save) loses a big paste on a
+     reload and complicates every code path that redraws a card. */
+  function noteOf(el) {
+    const art = el.closest('.note');
+    if (art) return state.notes[art.dataset.id];
+    const card = el.closest('.study-card');
+    if (card && study.queue[study.i]) return state.notes[study.queue[study.i].id];
+    return null;
+  }
+
+  function attachFiles(note, fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!note || !files.length) return Promise.resolve();
+    return files.reduce((chain, f) => chain.then(descs =>
+      NNFiles.put(f).then(d => descs.concat(d)).catch(err => {
+        toast(err && err.message ? err.message : 'Could not attach that file');
+        return descs;
+      })
+    ), Promise.resolve([])).then(descs => {
+      if (!descs.length) return;
+      const next = Object.assign({}, note, { files: (note.files || []).concat(descs) });
+      next.updatedAt = Date.now();
+      return NN.putNote(next).then(() => {
+        state.notes[next.id] = next;
+        redrawAfterFiles(next);
+        toast(descs.length > 1 ? descs.length + ' files attached' : 'Attached ' + descs[0].name);
+        autoSync();
+      });
+    });
+  }
+
+  function detachFile(note, fileId) {
+    if (!note) return;
+    const next = Object.assign({}, note, { files: (note.files || []).filter(f => f.id !== fileId) });
+    next.updatedAt = Date.now();
+    NNFiles.remove(fileId).catch(() => {});
+    NN.putNote(next).then(() => {
+      state.notes[next.id] = next;
+      redrawAfterFiles(next);
+      toast('Attachment removed');
+      autoSync();
+    });
+  }
+
+  /** Redraw whichever surface is showing this note, keeping the editor open. */
+  function redrawAfterFiles(note) {
+    const art = $('#list').querySelector('.note[data-id="' + cssq(note.id) + '"]');
+    const wasEditing = art && art.classList.contains('editing');
+    render();
+    if (wasEditing) {
+      const again = $('#list').querySelector('.note[data-id="' + cssq(note.id) + '"]');
+      if (again) again.classList.add('editing');
+    }
+    if (!$('#study').hidden && study.queue[study.i] && study.queue[study.i].id === note.id) {
+      study.queue[study.i] = note;
+      const card = $('#studyStage').querySelector('.study-card');
+      const editing = card && card.classList.contains('editing');
+      const revealed = study.revealed;
+      renderStudyCard();
+      const fresh = $('#studyStage').querySelector('.study-card');
+      if (revealed && fresh) fresh.querySelector('[data-st="reveal"]').click();
+      if (editing && fresh) fresh.querySelector('[data-st="edit"]').click();
+    }
+    paintFiles();
+  }
+
+  /** Open an attachment in its own tab (works for images, PDFs, anything). */
+  function openFile(id) {
+    if (!id) return;
+    NNFiles.url(id).then(u => { if (u) window.open(u, '_blank', 'noopener'); });
+  }
+
+  function onFileInput(e) {
+    const inp = e.target.closest('.file-add input[type="file"]');
+    if (!inp) return;
+    const note = noteOf(inp);
+    attachFiles(note, inp.files).then(() => { inp.value = ''; });
+  }
+  $('#list').addEventListener('change', onFileInput);
+  $('#studyStage').addEventListener('change', onFileInput);
+
+  /** Pasting a screenshot into an open editor attaches it. */
+  function onFilePaste(e) {
+    const items = e.clipboardData && e.clipboardData.files;
+    if (!items || !items.length) return;
+    const host = e.target.closest && e.target.closest('.note.editing, .study-card.editing');
+    if (!host) return;
+    const note = noteOf(e.target);
+    if (!note) return;
+    e.preventDefault();
+    attachFiles(note, items);
+  }
+  $('#list').addEventListener('paste', onFilePaste);
+  $('#studyStage').addEventListener('paste', onFilePaste);
 
   /* ---------- paste: repair formulas on the way in ----------
      Text pasted out of a PDF or a chat export carries raw LaTeX ("$\\ge 8mm^2$"),
@@ -793,9 +944,19 @@
         <div class="st-reveal" hidden>
           ${NN.squash(n.note) ? `<p class="st-note">${mathHtml(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
           <a class="st-open" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">Open source passage ↗</a>
+          ${filesViewHtml(n)}
         </div>
         <div class="st-edit" hidden>
           <textarea class="st-edit-note" placeholder="Your note…">${esc(n.note || '')}</textarea>
+          <label class="editor-lbl">Attachments</label>
+          <div class="files" data-files>
+            ${filesEditHtml(n)}
+            <label class="file-add">
+              <input type="file" multiple hidden>
+              <span>＋ file</span>
+            </label>
+            <span class="file-hint">or paste an image</span>
+          </div>
           <label class="editor-lbl">Labels</label>
           <div class="lbl-picker">${pickerHtml(n)}</div>
           <div class="row">
@@ -849,6 +1010,11 @@
       sw.parentNode.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', String(x === sw)));
       return;
     }
+
+    const del = e.target.closest('[data-act="file-del"]');
+    if (del) { detachFile(noteOf(del), del.dataset.id); return; }
+    const chip = e.target.closest('.file-chip');
+    if (chip) { openFile(chip.dataset.file); return; }
 
     const b = e.target.closest('[data-st]');
     if (!b) return;
