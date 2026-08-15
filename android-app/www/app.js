@@ -540,18 +540,19 @@
     return Promise.all([NN.getNotes(), NN.getProgress()]).then(pair =>
       nnPost(s.syncUrl, { action: 'sync', key: s.syncKey || '', notes: pair[0], progress: pair[1] }).then(data => {
         if (!data || !data.ok) throw new Error((data && data.error) || 'Server error');
-        // Re-read local right before merging so a grade/edit made *during* the
-        // slow network round-trip isn't clobbered by the stale snapshot we sent
-        // (e.g. a "Got it" bumping level 0→1 would otherwise revert to 0).
-        return NN.getNotes().then(freshLocal => {
-          const m = NN.merge(freshLocal, data.notes || {});
-          return NN.setNotes(m.notes)
+        // Re-read local, merge and store in ONE atomic step (NN.applyRemote).
+        // Doing it as three separate steps left a window in which a card graded
+        // during the slow network round-trip was read before the merge but
+        // overwritten by the write after it — the passage popped back up as due
+        // seconds after being answered.
+        return NN.applyRemote(data.notes || {}).then(m => {
+          return Promise.resolve()
             // Progress merges by its own rule (see NN.mergeProgress): counts take
             // the larger side rather than the newer one, so reviews done on the
             // phone and on the laptop on the same day both survive. A server not
             // yet updated returns nothing here and the local record stands.
             .then(() => (data.progress
-              ? NN.getProgress().then(mine => NN.setProgress(NN.mergeProgress(mine, data.progress)))
+              ? NN.updateProgress(mine => NN.mergeProgress(mine, data.progress))
               : null))
             .then(() => NN.saveSettings({ lastSync: Date.now() }))
             .then(() => load())

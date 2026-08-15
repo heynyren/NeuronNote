@@ -289,27 +289,19 @@ async function syncNow() {
     catch (e) { throw new Error('Server did not return JSON. Check that the Web App access is set to "Anyone".'); }
     if (!data.ok) throw new Error(data.error || 'Sync failed.');
 
-    // Re-read local right before merging. A grade/edit made *during* the slow
-    // network round-trip must not be clobbered by the stale snapshot we sent
-    // (e.g. a "Got it" that bumped level 0→1 would otherwise revert to 0).
-    // Newest-wins merge keeps the in-flight change because its updatedAt is newer.
-    const freshLocal = await NN.getNotes();
-    const merged = NN.merge(freshLocal, data.notes || {});
-    // A remote copy that won the merge carries no files field — restore ours so a
-    // sync never drops attachments that only exist here.
-    Object.keys(freshLocal).forEach(id => {
-      const mine = freshLocal[id];
-      if (mine && mine.files && mine.files.length && merged.notes[id] && !merged.notes[id].files) {
-        merged.notes[id] = Object.assign({}, merged.notes[id], { files: mine.files });
-      }
-    });
-    await NN.setNotes(merged.notes);
+    // Re-read local, merge and store in ONE atomic step (NN.applyRemote). Doing
+    // it as three separate steps left a window in which a card graded during the
+    // slow network round-trip was read before the merge but overwritten by the
+    // write after it — the passage popped back up as due seconds after being
+    // answered. applyRemote also restores local-only attachments, which a
+    // winning remote copy never carries.
+    const merged = await NN.applyRemote(data.notes || {});
     // Progress merges by its own rule (see NN.mergeProgress): counts take the
     // larger side rather than the newer one, so reviews done on the phone and on
     // the laptop on the same day both survive. A server that has not been
     // updated yet simply returns nothing here, and the local record stands.
     if (data.progress) {
-      await NN.setProgress(NN.mergeProgress(await NN.getProgress(), data.progress));
+      await NN.updateProgress(mine => NN.mergeProgress(mine, data.progress));
     }
     const now = Date.now();
     await NN.saveSettings({ lastSync: now });

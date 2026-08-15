@@ -219,6 +219,45 @@
     return new Promise(resolve => { try { localStorage.setItem(STORE_KEY, s); } catch (e) {} resolve(); });
   }
 
+  /* ---------- one writer at a time ----------
+     Everything lives in one blob under a single key, so every write is a
+     read-modify-write of the whole store. Fire two at once — which is exactly
+     what grading three cards in two seconds does — and the second read happens
+     before the first write lands, so the second write puts back a blob that
+     still holds the OLD version of the first note. The grade is silently gone,
+     and it only shows up seconds later when the next sync or re-render reads
+     from disk: the due count drops, then climbs back.
+
+     With one shared key it is worse than losing a note: saving progress would
+     write back a stale `notes`, and saving a note a stale `progress`.
+
+     The fix is a single-file queue. Every mutation waits for the previous one,
+     so read and write always see the same state. Pure reads stay outside the
+     queue — a few milliseconds of staleness is harmless and they must not be
+     able to stall it. */
+  var chain = Promise.resolve();
+  function critical(fn) {
+    // .then(fn, fn) so one failed write cannot jam every later write.
+    var run = chain.then(fn, fn);
+    chain = run.then(function () {}, function () {});
+    return run;
+  }
+
+  /** Read the whole blob, hand it to fn, write back what fn leaves behind. */
+  function mutate(fn) {
+    return critical(function () {
+      return rawGet().then(function (data) {
+        var d = {
+          notes: (data && data.notes) || {},
+          settings: (data && data.settings) || {},
+          progress: (data && data.progress) || null
+        };
+        var out = fn(d);
+        return rawSet(out === undefined ? d : out);
+      });
+    });
+  }
+
   NN.getAll = function () {
     return rawGet().then(data => ({
       notes: (data && data.notes) || {},
@@ -230,52 +269,69 @@
   NN.getNotes = function () { return NN.getAll().then(r => r.notes); };
   NN.getSettings = function () { return NN.getAll().then(r => r.settings); };
 
-  // Everything shares one blob under a single key, so each writer has to carry
-  // the other fields through untouched — otherwise saving a note would quietly
-  // wipe the progress record, and vice versa.
   NN.setNotes = function (notes) {
-    return NN.getAll().then(all =>
-      rawSet({ notes, settings: all.settings, progress: all.progress }).then(() => notes));
+    return mutate(d => { d.notes = notes; }).then(() => notes);
   };
 
   NN.saveSettings = function (patch) {
-    return NN.getAll().then(all => {
-      const next = Object.assign({}, all.settings, patch);
-      return rawSet({ notes: all.notes, settings: next, progress: all.progress }).then(() => next);
-    });
+    let next;
+    return mutate(d => {
+      next = Object.assign({}, NN.DEFAULT_SETTINGS, d.settings, patch);
+      d.settings = next;
+    }).then(() => next);
   };
 
   NN.putNote = function (note) {
-    return NN.getNotes().then(notes => {
+    return mutate(d => {
+      // Stamped inside the critical section so the timestamp matches the write
+      // order, not the (possibly much earlier) moment the call was made.
       note.updatedAt = Date.now();
-      notes[note.id] = note;
-      return NN.setNotes(notes).then(() => note);
-    });
+      d.notes[note.id] = note;
+    }).then(() => note);
   };
 
   NN.removeNote = function (id) {
-    return NN.getNotes().then(notes => {
-      const cur = notes[id];
-      notes[id] = {
+    return mutate(d => {
+      const cur = d.notes[id];
+      d.notes[id] = {
         id, deleted: true, updatedAt: Date.now(),
         url: cur ? cur.url : '', createdAt: cur ? cur.createdAt : Date.now()
       };
-      return NN.setNotes(notes);
     });
+  };
+
+  /**
+   * Fold a remote notes map into the local one and store the result — all in a
+   * single critical section.
+   *
+   * Sync used to re-read local, merge, and write back as three separate steps.
+   * A card graded during those few milliseconds was read after the merge input
+   * was taken but before the write, so the write put the pre-grade copy back:
+   * the passage sprang up as due again a moment after being answered.
+   */
+  NN.applyRemote = function (remote) {
+    let res;
+    return mutate(d => {
+      res = NN.merge(d.notes, remote || {});
+      d.notes = res.notes;
+    }).then(() => res);
   };
 
 
   NN.getProgress = function () {
     return rawGet().then(function (data) { return (data && data.progress) || null; });
   };
-  NN.setProgress = function (d) {
-    return rawGet().then(function (data) {
-      return rawSet({
-        notes: (data && data.notes) || {},
-        settings: (data && data.settings) || {},
-        progress: d
-      });
-    });
+  NN.setProgress = function (p) {
+    return mutate(function (d) { d.progress = p; });
+  };
+
+  /** Read-modify-write the progress record inside one critical section. */
+  NN.updateProgress = function (fn) {
+    var next;
+    return mutate(function (d) {
+      next = fn(d.progress) || d.progress;
+      d.progress = next;
+    }).then(function () { return next; });
   };
 
 
@@ -284,14 +340,6 @@
      different rhythm (once per graded card) and merges by a different rule
      (larger count wins, not newer timestamp). Folding it into the notes map
      would put it through the notes' newest-wins merge and lose reviews. */
-
-  /** Read-modify-write the progress record in one hop. */
-  NN.updateProgress = function (fn) {
-    return NN.getProgress().then(function (cur) {
-      var next = fn(cur) || cur;
-      return NN.setProgress(next).then(function () { return next; });
-    });
-  };
 
   /** Today's bucket in the log, created on demand. */
   function todayBucket(d) {
@@ -337,14 +385,19 @@
    * passages are in the notebook, which can grow from another device.
    */
   NN.checkBadges = function (stats) {
-    return Promise.all([NN.getProgress(), stats ? stats() : {}]).then(function (r) {
-      var d = NN.normalizeProgress(r[0]);
-      var view = NN.progressOverview(d, r[1] || {});
-      var fresh = NN.newlyEarnedBadges(view, d.badges, NN.pDay());
-      var ids = Object.keys(fresh);
-      if (!ids.length) return [];
-      Object.keys(fresh).forEach(function (id) { d.badges[id] = fresh[id]; });
-      return NN.setProgress(d).then(function () { return ids; });
+    // The note-side numbers are derived from data already in memory, so they are
+    // gathered before the critical section — only the read-modify-write of the
+    // progress record needs to be serialised.
+    return Promise.resolve(stats ? stats() : {}).then(function (extra) {
+      var ids = [];
+      return NN.updateProgress(function (cur) {
+        var d = NN.normalizeProgress(cur);
+        var view = NN.progressOverview(d, extra || {});
+        var fresh = NN.newlyEarnedBadges(view, d.badges, NN.pDay());
+        ids = Object.keys(fresh);
+        ids.forEach(function (id) { d.badges[id] = fresh[id]; });
+        return d;
+      }).then(function () { return ids; });
     });
   };
 
