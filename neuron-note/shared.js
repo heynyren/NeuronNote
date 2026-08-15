@@ -426,63 +426,148 @@
   };
 
   /* ---------- data store ---------- */
-  NN.getAll = function () {
-    return new Promise(resolve => {
-      chrome.storage.local.get({ notes: {}, settings: {} }, res => {
-        resolve({
-          notes: res.notes || {},
-          settings: Object.assign({}, NN.DEFAULT_SETTINGS, res.settings || {})
-        });
+
+  /* ---------- one writer at a time ----------
+     Every write below is a read-modify-write of the whole store: read the map,
+     change one entry, write the map back. Fire two of those at once — which is
+     exactly what grading three cards in two seconds does — and the second read
+     happens before the first write lands, so the second write puts back a map
+     that still holds the OLD version of the first note. The grade is silently
+     gone, and it only becomes visible seconds later when the next sync or
+     re-render reads from disk again: the due count drops, then climbs back.
+
+     The fix is a single-file queue. Every mutation waits for the previous one
+     to finish, so read and write always see the same state. Reads that do not
+     modify anything (getNotes, getSettings) stay outside the queue — they can
+     be a few milliseconds stale without harm and must not be able to stall it. */
+  var chain = Promise.resolve();
+  function critical(fn) {
+    // .then(fn, fn) so one failed write cannot jam every later write.
+    var run = chain.then(fn, fn);
+    chain = run.then(function () {}, function () {});
+    return run;
+  }
+
+  /* Raw access, NOT queued — only ever called from inside critical(). */
+  function readKey(key, fallback) {
+    var def = {};
+    def[key] = fallback;
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(def, function (res) { resolve(res[key] === undefined ? fallback : res[key]); });
+    });
+  }
+  function writeKey(key, value) {
+    var obj = {};
+    obj[key] = value;
+    return new Promise(function (resolve) { chrome.storage.local.set(obj, resolve); });
+  }
+
+  /** Read the notes map, hand it to fn, write back whatever fn leaves behind. */
+  function mutateNotes(fn) {
+    return critical(function () {
+      return readKey('notes', {}).then(function (notes) {
+        var out = fn(notes);
+        return writeKey('notes', out === undefined ? notes : out);
       });
+    });
+  }
+
+  NN.getAll = function () {
+    return Promise.all([readKey('notes', {}), readKey('settings', {})]).then(function (r) {
+      return {
+        notes: r[0] || {},
+        settings: Object.assign({}, NN.DEFAULT_SETTINGS, r[1] || {})
+      };
     });
   };
 
-  NN.getNotes = function () { return NN.getAll().then(r => r.notes); };
-  NN.getSettings = function () { return NN.getAll().then(r => r.settings); };
+  NN.getNotes = function () { return readKey('notes', {}); };
+  NN.getSettings = function () {
+    return readKey('settings', {}).then(function (s) {
+      return Object.assign({}, NN.DEFAULT_SETTINGS, s || {});
+    });
+  };
 
   NN.setNotes = function (notes) {
-    return new Promise(resolve => chrome.storage.local.set({ notes }, resolve));
+    return critical(function () { return writeKey('notes', notes); }).then(function () { return notes; });
   };
 
   NN.saveSettings = function (patch) {
-    return NN.getSettings().then(s => {
-      const next = Object.assign({}, s, patch);
-      return new Promise(resolve => chrome.storage.local.set({ settings: next }, () => resolve(next)));
-    });
+    var next;
+    return critical(function () {
+      return readKey('settings', {}).then(function (s) {
+        next = Object.assign({}, NN.DEFAULT_SETTINGS, s || {}, patch);
+        return writeKey('settings', next);
+      });
+    }).then(function () { return next; });
   };
 
   /** Write/overwrite a note and stamp the time. */
   NN.putNote = function (note) {
-    return NN.getNotes().then(notes => {
+    return mutateNotes(function (notes) {
+      // Stamped inside the critical section so the timestamp matches the write
+      // order, not the (possibly much earlier) moment the call was made.
       note.updatedAt = Date.now();
       notes[note.id] = note;
-      return NN.setNotes(notes).then(() => note);
-    });
+    }).then(function () { return note; });
   };
 
   NN.removeNote = function (id) {
-    return NN.getNotes().then(notes => {
-      const cur = notes[id];
+    return mutateNotes(function (notes) {
+      var cur = notes[id];
       notes[id] = {
-        id,
+        id: id,
         deleted: true,
         updatedAt: Date.now(),
         url: cur ? cur.url : '',
         createdAt: cur ? cur.createdAt : Date.now()
       };
-      return NN.setNotes(notes);
     });
+  };
+
+  /**
+   * Fold a remote notes map into the local one and store the result — all in a
+   * single critical section.
+   *
+   * Sync used to re-read local, merge, and write back as three separate steps.
+   * A card graded during those few milliseconds was read after the merge input
+   * was taken but before the write, so the write put the pre-grade copy back:
+   * the passage sprang up as due again a moment after being answered.
+   *
+   * Attachments are local-only, so a remote copy that wins the merge carries no
+   * `files`; ours are put back here rather than by the caller, which would put
+   * the same gap back.
+   */
+  NN.applyRemote = function (remote) {
+    var res;
+    return mutateNotes(function (local) {
+      res = NN.merge(local, remote || {});
+      Object.keys(local).forEach(function (id) {
+        var mine = local[id];
+        if (mine && mine.files && mine.files.length && res.notes[id] && !res.notes[id].files) {
+          res.notes[id] = Object.assign({}, res.notes[id], { files: mine.files });
+        }
+      });
+      return res.notes;
+    }).then(function () { return res; });
   };
 
   /** List of live notes, newest first. */
 
-  NN.getProgress = function () {
-    return new Promise(function (resolve) {
-      chrome.storage.local.get({ progress: null }, function (res) { resolve(res.progress); });
-    });
-  };
+  NN.getProgress = function () { return readKey('progress', null); };
   NN.setProgress = function (d) {
-    return new Promise(function (resolve) { chrome.storage.local.set({ progress: d }, resolve); });
+    return critical(function () { return writeKey('progress', d); });
+  };
+
+  /** Read-modify-write the progress record inside one critical section. */
+  NN.updateProgress = function (fn) {
+    var next;
+    return critical(function () {
+      return readKey('progress', null).then(function (cur) {
+        next = fn(cur) || cur;
+        return writeKey('progress', next);
+      });
+    }).then(function () { return next; });
   };
 
   /* ---------- progress tracking (model & rendering live in progress.js) ----------
@@ -490,14 +575,6 @@
      different rhythm (once per graded card) and merges by a different rule
      (larger count wins, not newer timestamp). Folding it into the notes map
      would put it through the notes' newest-wins merge and lose reviews. */
-
-  /** Read-modify-write the progress record in one hop. */
-  NN.updateProgress = function (fn) {
-    return NN.getProgress().then(function (cur) {
-      var next = fn(cur) || cur;
-      return NN.setProgress(next).then(function () { return next; });
-    });
-  };
 
   /** Today's bucket in the log, created on demand. */
   function todayBucket(d) {
@@ -543,14 +620,19 @@
    * passages are in the notebook, which can grow from another device.
    */
   NN.checkBadges = function (stats) {
-    return Promise.all([NN.getProgress(), stats ? stats() : {}]).then(function (r) {
-      var d = NN.normalizeProgress(r[0]);
-      var view = NN.progressOverview(d, r[1] || {});
-      var fresh = NN.newlyEarnedBadges(view, d.badges, NN.pDay());
-      var ids = Object.keys(fresh);
-      if (!ids.length) return [];
-      Object.keys(fresh).forEach(function (id) { d.badges[id] = fresh[id]; });
-      return NN.setProgress(d).then(function () { return ids; });
+    // The note-side numbers are derived from data already in memory, so they are
+    // gathered before the critical section — only the read-modify-write of the
+    // progress record needs to be serialised.
+    return Promise.resolve(stats ? stats() : {}).then(function (extra) {
+      var ids = [];
+      return NN.updateProgress(function (cur) {
+        var d = NN.normalizeProgress(cur);
+        var view = NN.progressOverview(d, extra || {});
+        var fresh = NN.newlyEarnedBadges(view, d.badges, NN.pDay());
+        ids = Object.keys(fresh);
+        ids.forEach(function (id) { d.badges[id] = fresh[id]; });
+        return d;
+      }).then(function () { return ids; });
     });
   };
 
