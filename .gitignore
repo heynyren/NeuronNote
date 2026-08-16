@@ -46,3 +46,9 @@ desktop.ini
 secrets.json
 *.local
 node_modules/
+
+# --- Ảnh chụp màn hình do bộ thử Playwright ghi ra ---
+# Chúng rơi thẳng vào thư mục extension mỗi lần chạy thử, làm bẩn cây làm việc
+# và dễ bị commit nhầm. Ảnh dùng cho README thì đặt ở nơi khác và theo dõi bình
+# thường, chứ không phải mấy tệp tự sinh này.
+neuron-note/nn-*.png
