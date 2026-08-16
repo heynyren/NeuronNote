@@ -109,12 +109,14 @@ async function flashBadge(tabId, text, color) {
   } catch (e) { /* tab already closed */ }
 }
 
-async function captureAndSave(tab, fallbackText, label) {
+async function captureAndSave(tab, fallbackText, label, sanCap) {
   try {
     label = label || '';
-    const ok = await ensureContentScript(tab.id);
+    // sanCap: người gọi đã có sẵn đoạn cần lưu (bảng lời thoại YouTube), khỏi
+    // phải đi vòng hỏi lại content script.
+    const ok = sanCap ? true : await ensureContentScript(tab.id);
 
-    let cap = ok ? await askTab(tab.id, { type: 'CAPTURE' }) : null;
+    let cap = sanCap || (ok ? await askTab(tab.id, { type: 'CAPTURE' }) : null);
 
     if (!cap || !cap.text) {
       if (!fallbackText.trim()) {
@@ -232,6 +234,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'SAVE_FROM_PAGE': {
         if (sender.tab) captureAndSave(sender.tab, '', msg.label || '');
+        sendResponse({ ok: true });
+        break;
+      }
+      // Bảng lời thoại YouTube gửi thẳng đoạn cần lưu kèm mốc giây trong URL.
+      case 'SAVE_CAP': {
+        if (sender.tab && msg.cap && msg.cap.text) {
+          captureAndSave(sender.tab, '', msg.label || '', msg.cap);
+        }
         sendResponse({ ok: true });
         break;
       }

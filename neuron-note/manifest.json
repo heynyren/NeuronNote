@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Neuron Note",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Select text → pick a label → save instantly, with a link back to the exact spot. Syncs via Google Drive.",
   "author": "Nyren Pham",
   "homepage_url": "https://github.com/heynyren/NeuronNote",
@@ -25,13 +25,26 @@
         "https://*/*"
       ],
       "js": [
-        "content.js"
+        "icons.js",
+        "content.js",
+        "cat-cau.js",
+        "phu-de.js"
       ],
       "css": [
         "content.css"
       ],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "phu-de-trang.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
     }
   ],
   "action": {

@@ -786,8 +786,13 @@
         sendResponse({ ok: true });
         return;
       case 'CAPTURE': {
-        const cap = capture();
-        sendResponse(cap);
+        // Bảng lời thoại YouTube giữ vùng bôi đen của nó trong shadow root, mà
+        // capture() thì hỏi window.getSelection() nên không thấy gì. Hỏi bảng
+        // trước: nó biết chính xác câu nào, giây thứ mấy, nên ghi chú lưu ra
+        // sẽ trỏ thẳng về đúng giây trong video.
+        let cap = null;
+        try { cap = window.__NN_ytChon && window.__NN_ytChon(); } catch (e) { cap = null; }
+        sendResponse(cap || capture());
         return;
       }
       case 'TOAST':
