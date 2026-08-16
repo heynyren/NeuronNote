@@ -2,7 +2,7 @@
  * LỜI THOẠI YOUTUBE — bảng phụ đề bám theo video, nối thẳng vào sổ tay
  * ====================================================================
  *
- * Xem một video mà nghe hụt một câu thì bình thường phải: bật phụ
+ * Xem một video tiếng Nhật mà nghe hụt một câu thì bình thường phải: bật phụ
  * đề của YouTube, tua đi tua lại, chép tay câu đó sang chỗ khác để tra. Đến khi
  * tra xong thì quên mất mình đang xem tới đâu, và vài hôm sau nhìn lại cái từ
  * trong sổ cũng chẳng nhớ nó ở video nào, phút thứ mấy.
@@ -500,6 +500,16 @@
   // lẫn vào đây thì vừa khó đọc vừa khó thử. Xem đầu tệp đó để biết cách cắt.
   const ghepCau = (cues, opt) => self.CatCau.ghepCau(cues, opt);
 
+  /**
+   * Mã ngôn ngữ của bản chép lời, đoán từ chính chữ chứ không tin mã mà YouTube
+   * khai. Dùng làm ngôn ngữ NGUỒN khi dịch: kênh tiếng Anh mở trong Neuron Note thì
+   * cũng phải dịch đúng từ tiếng Anh, chứ ép "ja" là ra một mớ vô nghĩa.
+   */
+  function nguNguon() {
+    const c = S.cau && S.cau[0];
+    if (!c) return "ja";
+    return self.CatCau.doanNgu(S.cau.slice(0, 20).map((x) => x.s).join(" ")).ma;
+  }
 
   /* ================================================================== */
   /* Trạng thái                                                          */
@@ -513,7 +523,9 @@
     hien: -1,           // chỉ số câu đang nói
     manh: -1,           // chỉ số mẩu đang được nói TRONG câu đó
     bam: true,          // tự cuộn theo video
+    songNgu: false,
     co: 2,              // nấc cỡ chữ đang dùng
+    dich: new Map(),    // chỉ số câu -> bản dịch
     host: null, root: null, oList: null, oTrong: null
   };
 
@@ -630,6 +642,9 @@
   /* Bảng lời thoại                                                      */
   /* ================================================================== */
 
+  /** Logo của extension, nhúng sẵn để khỏi phải mở web_accessible_resources. */
+  const LOGO = "data:image/png;base64,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";
+
   const CSS = `
     :host { all: initial; }
     * { box-sizing: border-box; }
@@ -656,7 +671,9 @@
     svg { display: inline-block; vertical-align: -.18em; flex: none; fill: currentColor; }
     button { font-family: inherit; cursor: pointer; }
     .top { display: flex; align-items: center; gap: 8px; padding: 11px 13px; }
-    .top .nm { font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; flex: 1; min-width: 0; }
+    .top .lg { flex:0 0 auto; border-radius:4px; display:block }
+    .top .nm { font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .top .n { color: var(--ink-3); font-size: 12px; font-weight: 600; }
     .chip {
       display: inline-flex; align-items: center; gap: 4px; flex: none;
@@ -761,6 +778,8 @@
   }
 
   function goBang() {
+    if (quanSat) { quanSat.disconnect(); quanSat = null; }
+    hangCho.clear(); clearTimeout(henDich);
     if (S.host) { S.host.remove(); S.host = null; S.root = null; S.oList = null; }
   }
 
@@ -781,8 +800,19 @@
 
     /* --- thanh tiêu đề --- */
     const top = document.createElement("div"); top.className = "top";
-    top.appendChild(ic("subtitles", 17));
-    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = "Lời thoại";
+    // Logo của chính extension này, không phải một icon "phụ đề" chung chung:
+    // cài cả mấy app cùng lúc thì trên một video có mấy bảng giống hệt nhau
+    // xếp chồng, nhìn vào không biết cái nào của ai. Lấy đúng hình đang nằm
+    // trên thanh công cụ Chrome thì khỏi phải đoán.
+    //
+    // Nhúng thẳng dạng base64 chứ không dùng chrome.runtime.getURL: đường ấy
+    // đòi khai báo web_accessible_resources, tức là mở cho MỌI trang web đọc
+    // được tệp trong extension, chỉ để lấy một cái hình 48px.
+    const lg = document.createElement("img"); lg.className = "lg";
+    lg.src = LOGO; lg.alt = ""; lg.width = 18; lg.height = 18;
+    top.appendChild(lg);
+    const nm = document.createElement("span"); nm.className = "nm";
+    nm.textContent = "Neuron Note · Lời thoại";
     top.appendChild(nm);
     const demCau = document.createElement("span"); demCau.className = "n";
     top.appendChild(demCau);
@@ -799,12 +829,10 @@
     const oTim = document.createElement("input");
     oTim.className = "find"; oTim.type = "search"; oTim.placeholder = "Tìm…";
     oTim.title = "Tìm trong lời thoại";
-    // Không có nút Song ngữ: Neuron Note là sổ ghi chú, không có đường dịch nào
-    // cả, và tự ý gọi ra một dịch vụ dịch bên ngoài thì đổi luôn cam kết riêng
-    // tư mà ứng dụng này đang tuyên bố. Bảng ở đây làm đúng việc của nó: đọc
-    // lời thoại, bấm là tua, bôi đen là lưu kèm mốc giây.
+    const nutSong = nutChip("translate", "Song ngữ", "Hiện kèm bản dịch tiếng Việt");
     const nutBam = nutChip("crosshair-simple", "Bám", "Tự cuộn theo dòng đang nói");
-    bar.appendChild(chonBan); bar.appendChild(oTim); bar.appendChild(nutBam);
+    nutSong.classList.toggle("on", S.songNgu);   // giữ lựa chọn khi chuyển video
+    bar.appendChild(chonBan); bar.appendChild(oTim); bar.appendChild(nutSong); bar.appendChild(nutBam);
     box.appendChild(bar);
 
     /* --- danh sách --- */
@@ -843,6 +871,11 @@
     });
     chonBan.addEventListener("change", () => { S.iBan = +chonBan.value; napCue(); });
     oTim.addEventListener("input", () => loc(oTim.value.trim()));
+    nutSong.addEventListener("click", () => {
+      S.songNgu = !S.songNgu;
+      nutSong.classList.toggle("on", S.songNgu);
+      veDanhSach();
+    });
     nutBam.addEventListener("click", () => {
       S.bam = !S.bam;
       nutBam.classList.toggle("on", S.bam);
@@ -880,19 +913,21 @@
      *
      * Vướng một chỗ: vùng bôi đen này nằm trong shadow root, mà content script
      * lại hỏi window.getSelection() nên hoàn toàn không nhìn thấy nó. Nên bảng
-     * tự ghi lại đoạn vừa chọn, kèm mốc giây, rồi mở một cửa cho content script
-     * hỏi tới. Nhờ vậy Alt+Shift+N vẫn lưu được y như trên trang thường —
-     * không phải học thêm thao tác nào mới.
+     * tự ghi lại đoạn vừa chọn, kèm mốc giây và bản dịch, rồi mở một cửa cho
+     * content script hỏi tới. Nhờ vậy Alt+Shift+N vẫn lưu được y như trên
+     * trang thường — không phải học thêm thao tác nào mới.
      */
     root.addEventListener("mouseup", (e) => {
       setTimeout(() => {
         const sel = root.getSelection ? root.getSelection() : document.getSelection();
         const chu = chuVungChon(sel);
         if (!chu || chu.length > 4000) return;
-        const m = dongDauVungChon(sel, e.target);
         // Vắt qua nhiều đoạn thì lấy mốc SỚM NHẤT: bạn muốn nghe lại từ đầu
         // đoạn vừa chọn, chứ không phải từ giữa.
-        vungVuaChon = { cap: capCua(m ? m.i : 0, chu, m ? m.t : null), luc: Date.now() };
+        const m = dongDauVungChon(sel, e.target);
+        const nghia = m ? S.dich.get(m.i) : "";
+        vungVuaChon = { cap: capCua(m ? m.i : 0, chu, m ? m.t : null,
+          nghia && nghia !== "—" ? nghia : ""), luc: Date.now() };
       }, 10);
     });
 
@@ -924,9 +959,44 @@
      * Đang bật Song ngữ thì thôi: bản dịch đã nằm ngay dưới từng dòng rồi, bày
      * thêm một ô đè lên chính chữ đang đọc chỉ tổ vướng.
      */
-    // Không có ô dịch nhanh khi rê chuột: ở đây chẳng có gì để hiện thêm.
-    // Rê chuột vẫn làm nổi mẩu đang trỏ (CSS lo), bấm vẫn tua.
+    let dongDangRe = -1, khoaDangRe = "";
+    const anTip = () => { tip.classList.remove("hien"); dongDangRe = -1; khoaDangRe = ""; };
+    const veTip = (i, giay) => {
+      const ln = list.querySelector('.ln[data-i="' + i + '"]');
+      if (!ln) return;
+      tip.textContent = "";
+      const b = document.createElement("b");
+      b.textContent = dem(giay != null ? giay : (S.cau[i] ? S.cau[i].t : 0));
+      tip.appendChild(b);
+      const sp = document.createElement("span");
+      sp.textContent = S.dich.get(i) || "Đang dịch…";
+      tip.appendChild(sp);
+      tip.classList.add("hien");
+      // Đặt dưới dòng; sát đáy quá thì lật lên trên cho khỏi tràn ra ngoài bảng.
+      const tren = ln.offsetTop - list.scrollTop + ln.offsetHeight + 6;
+      const cao = tip.offsetHeight || 40;
+      tip.style.top = (tren + cao > list.clientHeight ? Math.max(4, tren - ln.offsetHeight - cao - 12) : tren) + "px";
+    };
+    list.addEventListener("mousemove", (e) => {
+      if (S.songNgu) { anTip(); return; }
+      const el = e.target;
+      const ln = el && el.closest ? el.closest(".ln") : null;
+      if (!ln) { anTip(); return; }
+      const pc = el.closest(".pc");
+      const m = pc ? mocCuaManh(pc) : null;
+      const i = +ln.dataset.i;
+      const giay = m ? m.t : (S.cau[i] ? S.cau[i].t : 0);
+      const khoa = i + ":" + (m ? m.k : -1);
+      if (khoa === khoaDangRe) return;
+      khoaDangRe = khoa; dongDangRe = i;
+      if (!S.dich.has(i)) { hangCho.add(i); henGui(); }   // chưa kịp dịch thì giục
+      veTip(i, giay);
+    });
+    list.addEventListener("mouseleave", anTip);
+    list.addEventListener("scroll", anTip);
+
     S.uiBan = chonBan; S.uiDem = demCau; S.uiBack = back; S.uiTim = oTim; S.uiTip = tip;
+    S.veTip = veTip; S.dongDangRe = () => dongDangRe;
     return true;
   }
 
@@ -965,6 +1035,11 @@
 
       const tx = document.createElement("div"); tx.className = "tx";
       veManh(tx, c);
+      if (S.songNgu) {
+        const vi = document.createElement("span"); vi.className = "vi";
+        vi.textContent = S.dich.has(i) ? S.dich.get(i) : "…";
+        tx.appendChild(vi);
+      }
       ln.appendChild(tx);
 
       const sv = document.createElement("button");
@@ -977,6 +1052,7 @@
       list.appendChild(ln);
     });
     S.uiDem.textContent = S.cau.length ? S.cau.length + " câu" : "";
+    batQuanSat();
     danhDau(true);
   }
 
@@ -1074,6 +1150,7 @@
       if (i !== S.hien) {
         S.hien = i; S.manh = -1;
         danhDau(false);
+        dichCauDangNoi(i);
       }
       const k = timManh(i, t);
       if (k !== S.manh) { S.manh = k; danhDauManh(k); }
@@ -1105,14 +1182,103 @@
     if (c) tuaGiay(c.t, i);
   }
 
-  /**
-   * Lưu một câu thành ghi chú.
+  /* --- dịch song ngữ --- */
+  /*
+   * Ba thứ làm bản cũ ì ạch, sửa cả ba:
    *
-   * Không dùng đường CAPTURE thông thường: vùng bôi đen của bảng này nằm trong
-   * shadow root, mà content script thì hỏi window.getSelection() nên không
-   * nhìn thấy. Ở đây mình biết chính xác câu nào và giây thứ mấy, nên gửi
-   * thẳng payload sang background — vừa gọn vừa không sợ trượt.
+   *  · Chỉ dịch thêm mỗi khi video sang câu mới. Cuộn xuống đọc trước thì cứ
+   *    nằm im ở dấu "…" cho tới lúc video chạy tới — nhìn như treo. Nay dùng
+   *    IntersectionObserver: dòng nào lọt vào tầm mắt là dịch dòng đó.
+   *
+   *  · Mỗi câu một tin nhắn riêng sang nền, mà mỗi lượt dịch lẻ lại đọc-rồi-ghi
+   *    CẢ bộ đệm vào chrome.storage. Gần trăm câu thành gần trăm vòng như thế.
+   *    Nay gom thành một tin nhắn cho cả loạt (TRANSLATE_MANY).
+   *
+   *  · Bản cũ đo offsetTop của TỪNG dòng mỗi lần chạy — bắt trình duyệt tính
+   *    lại bố cục cả bảng. IntersectionObserver không phải đo gì cả.
    */
+
+  let quanSat = null;
+  const hangCho = new Set();
+  let henDich = null;
+
+  function batQuanSat() {
+    if (quanSat) { quanSat.disconnect(); quanSat = null; }
+    // Cố ý KHÔNG phụ thuộc Song ngữ: dịch ngầm cả khi đang tắt, để rê chuột tới
+    // dòng nào là có bản dịch NGAY. Bản dịch nằm sẵn trong bộ nhớ thì bật Song
+    // ngữ sau đó cũng hiện tức thì, không phải chờ lần nữa.
+    if (!S.oList || typeof IntersectionObserver !== "function") return;
+    quanSat = new IntersectionObserver((mps) => {
+      let co = false;
+      mps.forEach((m) => {
+        if (!m.isIntersecting) return;
+        const i = +m.target.dataset.i;
+        if (S.dich.has(i)) return;
+        hangCho.add(i); co = true;
+      });
+      if (co) henGui();
+    }, { root: S.oList, rootMargin: "400px 0px" });
+    // Dịch sẵn cả phần ngay ngoài khung nhìn để cuộn tới là đã có chữ.
+    S.oList.querySelectorAll(".ln").forEach((ln) => quanSat.observe(ln));
+  }
+
+  /** Đếm số lượt dịch trượt của từng câu, để biết lúc nào thì thôi thử lại. */
+  const soLanTruot = new Map();
+
+  /** Gom vài nhịp rồi mới gửi: cuộn nhanh sẽ bắn ra hàng chục lượt liền nhau. */
+  function henGui() {
+    clearTimeout(henDich);
+    henDich = setTimeout(guiDich, 120);
+  }
+
+  function guiDich() {
+    const cho = [...hangCho].filter((i) => !S.dich.has(i) && S.cau[i]);
+    const ids = cho.slice(0, 40);
+    // Phần vượt quá một loạt phải GIỮ LẠI, không được xoá sạch hàng chờ: các
+    // dòng đó đang nằm sẵn trong tầm mắt nên sẽ không có lượt "lọt vào khung"
+    // nào nữa để đánh thức chúng — bỏ là chúng đứng mãi ở dấu "…".
+    hangCho.clear();
+    cho.slice(40).forEach((i) => hangCho.add(i));
+    if (!ids.length) return;
+    ids.forEach((i) => S.dich.set(i, ""));      // giữ chỗ, khỏi gửi trùng
+    const texts = ids.map((i) => S.cau[i].s.trim());
+    chrome.runtime.sendMessage({ type: "TRANSLATE_MANY", texts: texts, from: nguNguon(), to: "vi" }, (res) => {
+      const ra = (!chrome.runtime.lastError && res && res.ok) ? (res.texts || []) : [];
+      let truot = 0;
+      ids.forEach((i, k) => {
+        const t = ra[k] || "";
+        if (!t) {
+          // Lượt gọi trượt. TUYỆT ĐỐI không ghi "—" rồi coi như xong: ghi vào
+          // S.dich là câu đó bị đóng dấu vĩnh viễn, chẳng bao giờ hỏi lại nữa,
+          // và bạn nhìn thấy một câu không có nghĩa nằm giữa hai câu có nghĩa.
+          // Nhả nó ra, xếp lại hàng chờ, thử lại loạt sau.
+          S.dich.delete(i);
+          const lan = (soLanTruot.get(i) || 0) + 1;
+          soLanTruot.set(i, lan);
+          if (lan <= 3) { hangCho.add(i); truot++; return; }
+          S.dich.set(i, "—");               // thử mãi không được thì đành chịu
+        } else {
+          S.dich.set(i, t);
+          soLanTruot.delete(i);
+        }
+        const ln = S.oList && S.oList.querySelector('.ln[data-i="' + i + '"]');
+        const vi = ln && ln.querySelector(".vi");
+        if (vi) vi.textContent = S.dich.get(i);
+        // Đang rê chuột đúng dòng này mà bản dịch vừa về -> thay chữ "Đang dịch…"
+        if (S.veTip && S.dongDangRe && S.dongDangRe() === i) S.veTip(i);
+      });
+      // Trượt thì lùi lại một nhịp cho bên kia thở, đừng nã lại ngay lập tức.
+      if (hangCho.size) truot ? setTimeout(henGui, 1200) : henGui();
+    });
+  }
+
+  /** Đảm bảo câu đang nói có bản dịch, kể cả khi bạn đã cuộn đi chỗ khác. */
+  function dichCauDangNoi(i) {
+    if (!S.songNgu || i < 0 || S.dich.has(i)) return;
+    hangCho.add(i); henGui();
+  }
+
+  /* --- lưu một câu vào sổ tay --- */
   // Đoạn vừa bôi đen trong bảng, để content script hỏi tới khi bạn bấm lưu.
   let vungVuaChon = null;
 
@@ -1126,33 +1292,44 @@
     return vungVuaChon.cap;
   };
 
-  function luuCau(i, nut, nhan) {
-    const c = S.cau[i];
-    if (!c) return;
-    nut.disabled = true; nhan.textContent = "…";
-    chrome.runtime.sendMessage({ type: "SAVE_CAP", cap: capCua(i, c.s) }, () => {
-      nut.classList.add("done"); nut.disabled = false;
-      nut.textContent = ""; nut.appendChild(ic("check", 12));
-      const t = document.createElement("span"); t.textContent = "Đã lưu"; nut.appendChild(t);
-    });
-  }
-
   /**
    * Gói một đoạn lời thoại thành thứ mà background dựng ghi chú được.
    *
-   * Điểm cốt tử là `url`: kèm luôn &t=<giây>, nên mở lại ghi chú là về đúng
-   * giây người ta đang nói câu ấy — chắc hơn hẳn việc dò lại một đoạn chữ trên
-   * trang, vì mốc giây là toạ độ tuyệt đối, không trôi khi trang đổi nội dung.
+   * Hai thứ đáng giá nằm ở đây. Một là `url` kèm &t=<giây>: mở lại ghi chú là
+   * về đúng giây người ta đang nói câu ấy — chắc hơn hẳn việc dò lại một đoạn
+   * chữ trên trang, vì mốc giây là toạ độ tuyệt đối, không trôi khi trang đổi
+   * nội dung. Hai là `note` mang bản dịch: xem video kỹ thuật tiếng nước ngoài
+   * thì một câu gốc nằm trơ trong sổ chẳng giúp được gì.
    */
-  function capCua(i, chu, giay) {
+  function capCua(i, chu, giay, dich) {
     const n = nguon(i);
     const t = Math.max(0, Math.floor(giay != null ? giay : ((n && n.yt && n.yt.t) || 0)));
     return {
       text: chu,
+      note: dich || "",
       prefix: "", suffix: "",
       title: (S.tieuDe || "") + (S.kenh ? " — " + S.kenh : ""),
       url: "https://www.youtube.com/watch?v=" + encodeURIComponent(S.v) + "&t=" + t + "s"
     };
+  }
+
+  function luuCau(i, nut, nhan) {
+    const c = S.cau[i];
+    if (!c) return;
+    nut.disabled = true; nhan.textContent = "…";
+    const gui = (nghia) => {
+      chrome.runtime.sendMessage({ type: "SAVE_CAP", cap: capCua(i, c.s, null, nghia) }, () => {
+        nut.classList.add("done"); nut.disabled = false;
+        nut.textContent = ""; nut.appendChild(ic("check", 12));
+        const t = document.createElement("span"); t.textContent = "Đã lưu"; nut.appendChild(t);
+      });
+    };
+    // Đã có sẵn bản dịch thì dùng luôn; chưa có thì chờ dịch xong hãy lưu.
+    if (S.dich.get(i) && S.dich.get(i) !== "—") { gui(S.dich.get(i)); return; }
+    chrome.runtime.sendMessage({ type: "TRANSLATE_MANY", texts: [c.s], from: nguNguon(), to: "vi" }, (res) => {
+      const ra = (!chrome.runtime.lastError && res && res.ok) ? (res.texts || []) : [];
+      gui(ra[0] || "");
+    });
   }
 
   /* ================================================================== */
@@ -1163,6 +1340,7 @@
     const ban = S.ban[S.iBan];
     if (!ban) { trangThai("Video này không có phụ đề nào.", "subtitles-slash"); return; }
     trangThai("Đang tải lời thoại…");
+    S.dich.clear(); hangCho.clear();
     try {
       const kq = await layCue(ban);
       S.cau = ghepCau(kq.cue);
@@ -1202,7 +1380,7 @@
   }
 
   async function khoiDong(v) {
-    S.v = v; S.cau = []; S.hien = -1; S.bam = true;
+    S.v = v; S.cau = []; S.hien = -1; S.dich.clear(); S.bam = true;
     if (!dungBang()) return false;
     trangThai("Đang tìm phụ đề…");
     try {

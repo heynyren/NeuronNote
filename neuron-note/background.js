@@ -142,7 +142,9 @@ async function captureAndSave(tab, fallbackText, label, sanCap) {
         const std = NN.toStandardMath(src);
         return std && std !== NN.squash(cap.text) ? std : '';
       })(),
-      note: '',
+      // Bản dịch đi kèm khi lưu từ bảng lời thoại: xem video kỹ thuật tiếng
+      // nước ngoài thì câu gốc nằm một mình trong sổ chẳng giúp được gì.
+      note: cap.note || '',
       tags: label ? [label] : [],
       color: labelColor || settings.markColor || 'amber',
       url: NN.normalizeUrl(cap.url || tab.url),
@@ -197,6 +199,95 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   });
 });
 
+// ==== Dịch câu: gọi thẳng Google Dịch (nhanh), Apps Script làm dự phòng ====
+// Một video có gần trăm câu, nên 300 chỗ là chưa xem hết hai video đã bị đẩy
+// hết ra ngoài — mở lại video cũ vẫn phải dịch lại từ đầu. Bộ đệm này chỉ nằm
+// trong máy (không đi qua đồng bộ Drive), nên nới rộng gần như không tốn gì.
+const TR_MAX = 1200;                // số bản dịch giữ trong bộ đệm
+const TR_TTL = 30 * 86400000;
+
+// Endpoint Google Dịch công khai — không cần Apps Script nên nhanh hơn hẳn.
+async function gtxTranslate(text, f, t) {
+  // dt=t: bản dịch; dt=rm: phiên âm (romaji) của nguồn tiếng Nhật.
+  const url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&dt=rm"
+    + "&sl=" + encodeURIComponent(f || "ja") + "&tl=" + encodeURIComponent(t || "vi")
+    + "&q=" + encodeURIComponent(text);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("gtx HTTP " + r.status);
+  const data = await r.json();
+  const segs = (data && data[0]) || [];
+  const out = segs.map((s) => (s && s[0]) || "").join("").trim();
+  // Google để phiên âm nguồn ở phần tử [3] của đoạn cuối (chỗ [0] rỗng).
+  let reading = "";
+  for (const s of segs) { if (s && s[0] == null && typeof s[3] === "string") reading += s[3]; }
+  reading = reading.replace(/\s+/g, " ").trim();
+  if (!out) throw new Error("gtx rỗng");
+  return { text: out, reading: reading };
+}
+/**
+ * Dịch NHIỀU câu trong một lượt.
+ *
+ * Vì sao cần hàm riêng thay vì gọi handleTranslate nhiều lần: mỗi lượt dịch lẻ
+ * phải ĐỌC cả bộ đệm rồi GHI lại cả bộ đệm (tối đa 300 mục) vào chrome.storage.
+ * Dịch một câu thì không thấy gì, nhưng bảng lời thoại có gần trăm câu — thành
+ * gần trăm vòng đọc-ghi cả bộ đệm, và đó mới là thứ làm giao diện khựng, chứ
+ * không phải mạng. Ở đây: đọc MỘT lần, ghi MỘT lần.
+ *
+ * Tiện thể sửa luôn một lỗi âm thầm của cách cũ: các lượt lẻ chạy song song đều
+ * đọc-sửa-ghi cùng một object, nên lượt ghi sau xoá mất bản dịch của lượt trước
+ * — bộ đệm gần như không giữ được gì, lần sau mở lại vẫn phải dịch lại từ đầu.
+ */
+async function handleTranslateMany(rawTexts, from, to) {
+  const texts = (rawTexts || []).map((x) => String(x || "").trim());
+  if (!texts.length) return { ok: true, texts: [] };
+  const f = from || "auto", t = to || "vi";
+
+  const { trCache } = await chrome.storage.local.get("trCache");
+  const c = trCache || {};
+  const now = Date.now();
+  const out = new Array(texts.length).fill("");
+  const can = [];
+  texts.forEach((x, i) => {
+    if (!x) return;
+    const h = c[f + ">" + t + ":" + x];
+    if (h && now - (h.ts || 0) < TR_TTL) out[i] = h.v; else can.push(i);
+  });
+
+  // Song song có giới hạn: mở hết cùng lúc thì trình duyệt cũng xếp hàng ở tầng
+  // kết nối, mà lỡ hỏng thì hỏng cả loạt.
+  //
+  // Và phải THỬ LẠI: gửi một loạt 40 câu thì bên kia hay chặn bớt vài câu giữa
+  // chừng. Bỏ luôn câu hỏng thì trên bảng nó nằm mãi ở dấu "—" trong khi hàng
+  // xóm hai bên đều có nghĩa — trông như mình bỏ sót, mà thật ra chỉ là một
+  // lượt gọi trượt.
+  const SONG = 6;
+  let ke = 0;
+  await Promise.all(new Array(Math.min(SONG, can.length)).fill(0).map(async () => {
+    while (ke < can.length) {
+      const i = can[ke++];
+      for (let lan = 0; lan < 3; lan++) {
+        try {
+          const g = await gtxTranslate(texts[i], f, t);
+          if (g && g.text) {
+            out[i] = g.text;
+            c[f + ">" + t + ":" + texts[i]] = { v: g.text, rd: g.reading || "", ts: now };
+            break;
+          }
+        } catch (e) { /* thử lại, đừng kéo cả loạt xuống theo */ }
+        if (lan < 2) await new Promise((r) => setTimeout(r, 250 * Math.pow(3, lan)));
+      }
+    }
+  }));
+
+  const keys = Object.keys(c);
+  if (keys.length > TR_MAX) {
+    keys.sort((a, b) => (c[a].ts || 0) - (c[b].ts || 0));
+    for (let i = 0; i < keys.length - TR_MAX; i++) delete c[keys[i]];
+  }
+  await chrome.storage.local.set({ trCache: c });
+  return { ok: true, texts: out };
+}
+
 /* ---------------- messages from content / pages ---------------- */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
@@ -235,6 +326,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'SAVE_FROM_PAGE': {
         if (sender.tab) captureAndSave(sender.tab, '', msg.label || '');
         sendResponse({ ok: true });
+        break;
+      }
+      // Dịch cả loạt câu cho bảng lời thoại. Listener này vốn đã trả lời không
+      // đồng bộ (return true ở cuối), nên chỉ cần await rồi gọi sendResponse.
+      case 'TRANSLATE_MANY': {
+        try {
+          sendResponse(await handleTranslateMany(msg.texts, msg.from, msg.to));
+        } catch (e) {
+          sendResponse({ ok: false, error: String((e && e.message) || e) });
+        }
         break;
       }
       // Bảng lời thoại YouTube gửi thẳng đoạn cần lưu kèm mốc giây trong URL.
