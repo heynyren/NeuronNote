@@ -219,13 +219,12 @@
     return color ? `<span class="ldot" style="background:var(--${esc(color)})"></span>` : '<span class="ldot muted"></span>';
   }
   function pickerHtml(selected) {
-    const have = new Set(selected || []);
-    const defined = state.settings.labels || [];
-    let html = defined.map(l =>
-      `<button type="button" class="lchip" data-name="${esc(l.name)}" aria-pressed="${have.has(l.name)}">${labelDot(l.color)}${esc(l.name)}</button>`).join('');
-    (selected || []).filter(t => !defined.some(l => l.name === t)).forEach(t => {
-      html += `<button type="button" class="lchip" data-name="${esc(t)}" aria-pressed="true">${labelDot('')}${esc(t)}</button>`;
-    });
+    // Mọi nhãn đáng mời — kể cả nhãn bạn đã gõ tay lên một đoạn khác. Trước đây
+    // chỗ này chỉ liệt kê nhãn định sẵn cộng nhãn của riêng đoạn đang sửa, nên
+    // nhãn dùng ở đoạn khác không hiện ra và phải gõ lại bằng tay; gõ sai một
+    // chữ là lặng lẽ sinh ra nhãn thứ hai. Xem NN.labelChoices.
+    let html = NN.labelChoices(state.settings, state.notes, selected).map(c =>
+      `<button type="button" class="lchip" data-name="${esc(c.name)}" aria-pressed="${c.on}">${labelDot(c.color)}${esc(c.name)}</button>`).join('');
     html += `<span class="lchip-add"><button type="button" class="lchip add" data-add>＋ label</button>
       <input type="text" class="lchip-input" placeholder="New label name" maxlength="40" hidden></span>`;
     return html;
@@ -507,8 +506,20 @@
     if (!name || !old || name === old) { inp.value = old || ''; return; }
     if (labels.some((x, j) => j !== i && x.name === name)) { alert('A label with this name already exists.'); inp.value = old; return; }
     labels[i] = { name, color: labels[i].color };
-    persistLabels(labels, state.settings.activeLabel === old ? name : state.settings.activeLabel);
+    const activeLabel = state.settings.activeLabel === old ? name : state.settings.activeLabel;
+    // Đổi tên nhãn thì phải đổi luôn trên từng đoạn đang mang nhãn đó. Trước
+    // đây chỉ sửa mỗi settings.labels, nên nhãn vừa đổi tên hiện 0 đoạn còn mọi
+    // đoạn cũ tụt xuống thành nhãn gõ tay không màu.
+    doiTenNhanTrenMoiDoan(old, name).then(() => { persistLabels(labels, activeLabel); autoSync(); });
   });
+
+  /** Đổi tên một nhãn trên mọi đoạn đang mang nó, rồi ghi xuống. */
+  function doiTenNhanTrenMoiDoan(old, name) {
+    const kq = NN.renameTag(state.notes, old, name);
+    if (!kq.changed) return Promise.resolve(0);
+    state.notes = kq.notes;
+    return NN.setNotes(kq.notes).then(() => kq.changed);
+  }
   $('#newLabelAdd').addEventListener('click', addLabel);
   $('#newLabelName').addEventListener('keydown', e => { if (e.key === 'Enter') addLabel(); });
   function addLabel() {

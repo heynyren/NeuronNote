@@ -372,6 +372,62 @@
   };
 
   /** Add label names not yet present to settings.labels (keep existing ones). Returns the new labels array. */
+  /**
+   * Every label worth offering in a picker, in the order a picker should show them.
+   *
+   * The library filter row has always listed predefined labels PLUS ad-hoc ones
+   * already in use; the pickers only listed predefined ones plus whatever this
+   * one note carried. So a label you had typed onto some other passage was not
+   * offered anywhere — you had to retype it by hand, and a typo quietly made a
+   * second label. Both places read this now, so they cannot drift apart again.
+   *
+   * @param {string[]} [selected] labels ticked right now (may include ones used nowhere else).
+   * @returns {{name: string, color: string, on: boolean}[]}
+   */
+  NN.labelChoices = function (settings, notes, selected) {
+    const on = new Set(selected || []);
+    const defined = (settings && settings.labels) || [];
+    const seen = new Set();
+    const out = [];
+    defined.forEach(function (l) {
+      if (!l || !l.name || seen.has(l.name)) return;
+      seen.add(l.name);
+      out.push({ name: l.name, color: l.color || '', on: on.has(l.name) });
+    });
+    const adhoc = {};
+    NN.live(notes || {}).forEach(function (n) {
+      (n.tags || []).forEach(function (t) { if (t && !seen.has(t)) adhoc[t] = 1; });
+    });
+    (selected || []).forEach(function (t) { if (t && !seen.has(t)) adhoc[t] = 1; });
+    Object.keys(adhoc).sort().forEach(function (t) {
+      out.push({ name: t, color: '', on: on.has(t) });
+    });
+    return out;
+  };
+
+  /**
+   * Rename a label on every passage that carries it.
+   *
+   * Renaming used to touch only settings.labels, so each passage kept the OLD
+   * name: the renamed label showed 0 passages, and every passage that had it
+   * turned into a colourless ad-hoc tag. Pure function — the caller writes.
+   * `updatedAt` moves so the rename travels through sync like any other edit.
+   */
+  NN.renameTag = function (notes, old, name) {
+    const out = {};
+    const now = Date.now();
+    let changed = 0;
+    Object.keys(notes || {}).forEach(function (id) {
+      const n = notes[id];
+      if (!n || n.deleted || !(n.tags || []).includes(old)) { out[id] = n; return; }
+      const tags = n.tags.map(function (t) { return t === old ? name : t; })
+        .filter(function (t, i, a) { return a.indexOf(t) === i; });   // gộp nếu trùng tên có sẵn
+      out[id] = Object.assign({}, n, { tags: tags, updatedAt: now });
+      changed++;
+    });
+    return { notes: out, changed: changed };
+  };
+
   NN.withNewLabels = function (settings, names) {
     const labels = (settings.labels || []).slice();
     (names || []).forEach(name => {
