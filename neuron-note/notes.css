@@ -318,6 +318,12 @@ kbd {
    chiếm hết dòng và bóp nhãn chữ xuống thành ba dòng. Ô tích thì cứ để nguyên
    cỡ của nó. */
 .editor input[type="checkbox"] { width: auto; margin: 0; }
+/* Ghi công tác giả ở cuối màn Cài đặt. */
+.credit { display: flex; align-items: center; gap: 11px; margin: 2px 0 6px; }
+.credit-flag { width: 30px; height: 20px; border-radius: 3px; flex: none; }
+.credit-name { font-weight: 650; font-size: 14px; color: var(--ink); }
+.credit-sub { font-size: 12px; color: var(--muted); }
+
 .study-ctl { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; }
 .mini-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); cursor: pointer; }
 .mini-check input { accent-color: var(--signal); }

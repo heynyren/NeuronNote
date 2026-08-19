@@ -232,6 +232,12 @@ button, input, textarea { font-family: inherit; }
 .mini-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; }
 .mini-check input { width: 18px; height: 18px; accent-color: var(--signal); }
 .big-check { display: flex; margin: 12px 0; }
+/* Ghi công tác giả ở cuối màn Cài đặt. */
+.credit { display: flex; align-items: center; gap: 11px; margin: 2px 0 6px; }
+.credit-flag { width: 30px; height: 20px; border-radius: 3px; flex: none; }
+.credit-name { font-weight: 650; font-size: 14px; color: var(--ink); }
+.credit-sub { font-size: 12px; color: var(--muted); }
+
 .study-ctl { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 
