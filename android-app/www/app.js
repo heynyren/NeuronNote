@@ -95,7 +95,7 @@
   }
 
   /** The passage to show: the LaTeX copy when the page had formulas, else the plain text. */
-  function bodyOf(n) { return n.rich || n.text || ''; }
+  const bodyOf = NN.bodyOf;
 
   function renderLib() {
     const all = NN.live(state.notes);
@@ -316,7 +316,7 @@
   /* ---------------- EDITOR ---------------- */
   function openEditor(note) {
     state.editingId = note.id;
-    $('#editQuote').textContent = note.text;
+    $('#editQuote').value = bodyOf(note);
     $('#editNote').value = note.note || '';
     $('#editPicker').innerHTML = pickerHtml(note.tags || []);
     const s = note.srs || {};
@@ -331,12 +331,16 @@
   $('#editSave').addEventListener('click', () => {
     const note = state.notes[state.editingId]; if (!note) return;
     const { tags, newLabels } = readPicker($('#editPicker'));
-    const next = Object.assign({}, note, { note: $('#editNote').value.trim(), tags });
+    const sua = NN.applyBodyEdit(note, $('#editQuote').value);
+    const next = Object.assign({}, sua.note, { note: $('#editNote').value.trim(), tags });
     if (tags.length && !note.color) next.color = labelColorOf(tags[0]) || next.color;
     NN.ensureSrs(next); next.srs = Object.assign({}, next.srs);
     if ($('#editKnown').checked) next.srs.known = true;
     else { next.srs.known = false; next.srs.learn = $('#editLearn').checked; }
-    if (isHttp(next.url)) next.fragUrl = NN.buildFragmentUrl(next);
+    // Sửa đoạn văn thì KHÔNG dựng lại link neo. Link neo tìm đúng chuỗi chữ đó
+    // trên trang gốc; chữ vừa bị sửa thì chuỗi đó không còn trên trang nữa, bấm
+    // "Open" sẽ nhảy vào khoảng không. Giữ link cũ — nó vẫn trỏ đúng chỗ đã lưu.
+    if (!sua.changed && isHttp(next.url)) next.fragUrl = NN.buildFragmentUrl(next);
     const after = newLabels.length
       ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, newLabels) }).then(s => { state.settings = s; })
       : Promise.resolve();

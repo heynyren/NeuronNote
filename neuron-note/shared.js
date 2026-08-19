@@ -389,6 +389,36 @@
    * @param {string[]} [selected] labels ticked right now (may include ones used nowhere else).
    * @returns {{name: string, color: string, on: boolean}[]}
    */
+  /**
+   * Đoạn văn đem ra hiển thị: bản LaTeX khi trang gốc có công thức, không thì
+   * bản chữ thường. Một định nghĩa duy nhất cho cả extension lẫn app.
+   */
+  NN.bodyOf = function (n) { return (n && (n.rich || n.text)) || ''; };
+
+  /**
+   * Áp một đoạn văn vừa được sửa tay lên ghi chú.
+   *
+   * Đoạn văn chép về vốn không sửa được: chép hụt mất nửa câu, hay dính thêm
+   * dòng quảng cáo, thì chỉ còn nước xoá đi chép lại — mà chép lại là mất sạch
+   * nhãn, ghi chú riêng và tiến độ ôn của mục đó.
+   *
+   * Người ta sửa đúng cái đang NHÌN THẤY, tức là bản LaTeX nếu có. Nên chuỗi
+   * vừa sửa vào thẳng `text`, và chỉ giữ lại `rich` khi trong đó thật sự còn
+   * công thức — sửa hết công thức đi thì `rich` không còn lý do tồn tại.
+   *
+   * Hàm thuần: trả về bản mới, không đụng vào bản cũ.
+   * @returns {{note: object, changed: boolean}}
+   */
+  NN.applyBodyEdit = function (note, raw) {
+    const body = String(raw == null ? '' : raw).trim();
+    // Rỗng thì bỏ qua: xoá trắng đoạn văn là xoá ghi chú, mà xoá thì có nút xoá.
+    if (!body || body === NN.bodyOf(note)) return { note: note, changed: false };
+    const next = Object.assign({}, note, { text: body });
+    if (NN.hasMath(body)) next.rich = body;
+    else delete next.rich;
+    return { note: next, changed: true };
+  };
+
   NN.labelChoices = function (settings, notes, selected) {
     const on = new Set(selected || []);
     const defined = (settings && settings.labels) || [];

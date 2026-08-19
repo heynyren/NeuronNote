@@ -160,7 +160,7 @@
   }
 
   /** The passage to show: the LaTeX copy when the page had formulas, else the plain text. */
-  function bodyOf(n) { return n.rich || n.text || ''; }
+  const bodyOf = NN.bodyOf;
 
   /* ---------- attachments ----------
      Thumbnails resolve asynchronously: the bytes live in IndexedDB, so markup
@@ -247,7 +247,10 @@
         ${tags ? `<div class="tagrow">${tags}</div>` : ''}
         ${filesViewHtml(n)}
         <div class="editor">
-          <textarea placeholder="Your note…">${esc(n.note || '')}</textarea>
+          <label class="editor-lbl">Passage</label>
+          <textarea class="ed-body" rows="4" placeholder="The passage itself…">${esc(bodyOf(n))}</textarea>
+          <label class="editor-lbl">Your note</label>
+          <textarea class="ed-note" placeholder="Your note…">${esc(n.note || '')}</textarea>
           <label class="editor-lbl">Attachments</label>
           <div class="files" data-files>
             ${filesEditHtml(n)}
@@ -342,7 +345,7 @@
         break;
       case 'edit':
         art.classList.add('editing');
-        art.querySelector('.editor textarea').focus();
+        art.querySelector('.editor .ed-body').focus();
         break;
       case 'cancel':
         art.classList.remove('editing');
@@ -355,8 +358,9 @@
         const newLabels = tags.filter(t => t && !( state.settings.labels || []).some(l => l.name === t)
           && art.querySelector('.lbl-picker .lchip[data-name="' + cssq(t) + '"].new'));
         const picked = art.querySelector('.sw[aria-pressed="true"]');
-        const next = Object.assign({}, note, {
-          note: art.querySelector('.editor textarea').value.trim(),
+        const sua = NN.applyBodyEdit(note, art.querySelector('.editor .ed-body').value);
+        const next = Object.assign({}, sua.note, {
+          note: art.querySelector('.editor .ed-note').value.trim(),
           tags,
           color: picked ? picked.dataset.color : (note.color || 'amber')
         });
@@ -370,7 +374,11 @@
           next.srs.known = false;
           next.srs.learn = !(learnCb && !learnCb.checked);
         }
-        next.fragUrl = NN.buildFragmentUrl(next);
+        // Sửa đoạn văn thì KHÔNG dựng lại link neo. Link neo tìm đúng chuỗi chữ
+        // đó trên trang gốc; chữ vừa bị sửa thì chuỗi đó không còn trên trang
+        // nữa, bấm "Open passage" sẽ nhảy vào khoảng không. Giữ link cũ — nó
+        // vẫn trỏ đúng chỗ đã lưu.
+        if (!sua.changed) next.fragUrl = NN.buildFragmentUrl(next);
 
         const afterSettings = newLabels.length
           ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, newLabels) }).then(s => { state.settings = s; })
@@ -1029,6 +1037,9 @@
           ${filesViewHtml(n)}
         </div>
         <div class="st-edit" hidden>
+          <label class="editor-lbl">Passage</label>
+          <textarea class="st-edit-body" rows="3" placeholder="The passage itself…">${esc(bodyOf(n))}</textarea>
+          <label class="editor-lbl">Your note</label>
           <textarea class="st-edit-note" placeholder="Your note…">${esc(n.note || '')}</textarea>
           <label class="editor-lbl">Attachments</label>
           <div class="files" data-files>
@@ -1108,7 +1119,7 @@
     if (act === 'edit') {
       card.classList.add('editing');
       card.querySelector('.st-edit').hidden = false;
-      card.querySelector('.st-edit-note').focus();
+      card.querySelector('.st-edit-body').focus();
       return;
     }
     if (act === 'cancel-edit') {
@@ -1122,13 +1133,15 @@
       const newLabels = tags.filter(t => t && !(state.settings.labels || []).some(l => l.name === t)
         && card.querySelector('.lbl-picker .lchip[data-name="' + cssq(t) + '"].new'));
       const picked = card.querySelector('.st-edit .sw[aria-pressed="true"]');
-      const next = Object.assign({}, n, {
+      const sua = NN.applyBodyEdit(n, card.querySelector('.st-edit-body').value);
+      const next = Object.assign({}, sua.note, {
         note: card.querySelector('.st-edit-note').value.trim(),
         tags,
         color: picked ? picked.dataset.color : (n.color || 'amber')
       });
       next.updatedAt = Date.now();
-      next.fragUrl = NN.buildFragmentUrl(next);
+      // Sửa đoạn văn thì giữ nguyên link neo — xem chỗ lưu bên danh sách.
+      if (!sua.changed) next.fragUrl = NN.buildFragmentUrl(next);
 
       const afterSettings = newLabels.length
         ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, newLabels) }).then(s => { state.settings = s; })

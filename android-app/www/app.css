@@ -224,7 +224,10 @@ button, input, textarea { font-family: inherit; }
 .sheet-foot .btn { margin-left: auto; }
 .sheet-foot .btn.danger { margin-left: 0; margin-right: auto; }
 .sheet-msg { font: 12px var(--mono); color: var(--signal); }
-.edit-quote { margin: 0 0 14px; font: italic 15px/1.55 var(--serif); color: #34383F; padding-left: 10px; border-left: 2px solid var(--mark); }
+/* Đoạn văn giờ sửa được, nên nó là ô nhập — vẫn giữ nét nghiêng và vạch vàng
+   bên trái để nhìn ra ngay đây là lời trích, không phải ghi chú của mình. */
+.edit-quote { margin: 0 0 14px; font: italic 15px/1.55 var(--serif); color: #34383F;
+  padding-left: 10px; border-left: 2px solid var(--mark); min-height: 76px; }
 .hint { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
 .mini-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; }
 .mini-check input { width: 18px; height: 18px; accent-color: var(--signal); }
