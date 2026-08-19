@@ -579,6 +579,11 @@
     host: null, root: null, oList: null, oTrong: null
   };
 
+  /** Số lần bấm Nạp lại mà bảng vẫn chưa ra chữ. */
+  let soLanNap = 0;
+  /** Mã video mà bạn đã tự đóng bảng — đừng dựng lại cho tới khi sang video khác. */
+  let tatCho = "";
+
   /**
    * Các nấc cỡ chữ.
    *
@@ -886,11 +891,31 @@
     top.appendChild(nm);
     const demCau = document.createElement("span"); demCau.className = "n";
     top.appendChild(demCau);
+    const nutNap = nutChip("arrows-clockwise", "", "Nạp lại bảng");
+    top.appendChild(nutNap);
     const nutCo = nutChip("text-aa", "", "Cỡ chữ — bấm để đổi");
     top.appendChild(nutCo);
     const nutThu = nutChip("caret-up", "", "Thu gọn");
     top.appendChild(nutThu);
+    const nutTat = nutChip("x", "", "Đóng bảng");
+    top.appendChild(nutTat);
     box.appendChild(top);
+
+    /*
+     * Nạp lại. Hai lần đầu chỉ dựng lại bảng — đủ cho trường hợp YouTube trả
+     * phụ đề chậm hoặc vừa hết quảng cáo. Vẫn không ra thì lần thứ ba tải lại
+     * hẳn trang, vì lúc đó thứ hỏng nằm ngoài tầm với của bảng này.
+     */
+    nutNap.addEventListener("click", () => {
+      if (soLanNap >= 2) { soLanNap = 0; location.reload(); return; }
+      soLanNap += 1;
+      nutNap.title = "Nạp lại bảng (lần " + soLanNap + "/2 — lần nữa sẽ tải lại cả trang)";
+      xemLai(true);
+    });
+
+    // Đóng bảng cho video này. Sang video khác thì bảng hiện lại — đóng là để
+    // dẹp chỗ lúc này, không phải tắt hẳn tính năng.
+    nutTat.addEventListener("click", () => { tatCho = S.v; goBang(); dungTheoDoi(); });
 
     /* --- thanh công cụ --- */
     const bar = document.createElement("div"); bar.className = "bar";
@@ -1424,6 +1449,7 @@
         ? "YouTube đang chặn đường tải phụ đề, phải đọc lại từ bảng của họ — đổi bản ở đây thì hãy đổi trong bảng đó"
         : "Chọn bản phụ đề";
       if (!S.cau.length) { trangThai("Bản phụ đề này rỗng.", "warning-circle"); return; }
+      soLanNap = 0;              // đã ra chữ -> lần bấm Nạp lại sau lại tính từ đầu
       veDanhSach();
       batTheoDoi();
     } catch (e) {
@@ -1498,10 +1524,13 @@
   }
 
   let dangCho = null;
-  function xemLai() {
+  function xemLai(ep) {
     const v = maVideo();
+    if (ep) tatCho = "";              // tự bấm Nạp lại thì tất nhiên là muốn bảng hiện lại
+    if (v && v === tatCho) return;    // video này bạn đã đóng bảng
     if (!v) { dungTheoDoi(); goBang(); S.v = ""; return; }
-    if (v === S.v && S.host && S.host.isConnected) return;
+    if (!ep && v === S.v && S.host && S.host.isConnected) return;
+    if (ep) S.v = "";
     dungTheoDoi();
     // Cột phải của YouTube dựng sau khi trang đã "xong", nên thử lại vài nhịp.
     clearInterval(dangCho);
@@ -1527,7 +1556,7 @@
     if (location.href !== urlCu) { urlCu = location.href; xemLai(); return; }
     // YouTube dựng lại cột phải khá tuỳ hứng và cuốn theo cả bảng này; dựng lại
     // khi thấy nó biến mất, chứ không bắt người dùng tải lại trang.
-    if (S.v && (!S.host || !S.host.isConnected) && choDat()) khoiDong(S.v);
+    if (S.v && S.v !== tatCho && (!S.host || !S.host.isConnected) && choDat()) khoiDong(S.v);
   }, 700);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", xemLai);
   else xemLai();
