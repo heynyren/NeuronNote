@@ -1,6 +1,32 @@
 /* Neuron Note — Android app (Capacitor). Shares NN.* from shared.js. */
 (function () {
   'use strict';
+
+  /* Thiếu chu.js thì cứ chạy bằng chữ gốc, đừng chết. */
+  const T = window.T || (x => x);
+  const T2 = window.T2 || ((x, thay) => {
+    let r = x;
+    for (const k in (thay || {})) r = r.split('{' + k + '}').join(thay[k]);
+    return r;
+  });
+
+  /* Ngôn ngữ giao diện: giao diện dựng bằng chuỗi mẫu HTML nên quét lại cây DOM
+     sau mỗi lượt vẽ, thay vì đi sửa từng chỗ trong chuỗi mẫu. Xem chu.js. */
+  function veChu() { if (window.Chu) Chu.quet(document.body); }
+  async function napChu() {
+    if (!window.Chu) return;
+    const st = await NN.getSettings();
+    const c = Chu.hopLe(st.chu);
+    const o = document.getElementById('chuNgu');
+    if (o) o.value = c;
+    Chu.dat(c, document.body);
+  }
+  document.addEventListener('change', e => {
+    const o = e.target.closest && e.target.closest('#chuNgu');
+    if (!o || !window.Chu) return;
+    // Vẽ lại từ chữ GỐC: quét trên bản đã dịch thì không tra ra khoá nào nữa.
+    NN.saveSettings({ chu: Chu.hopLe(o.value) }).then(() => location.reload());
+  });
   const $ = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
   const esc = NN.escapeHtml;
@@ -50,7 +76,7 @@
   function load() {
     return NN.getAll().then(r => { state.notes = r.notes; state.settings = r.settings; renderAll(); });
   }
-  function renderAll() { renderLib(); renderDue(); }
+  function renderAll() { renderLib(); renderDue(); veChu(); }   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
 
   /* ---------------- NOTEBOOK ---------------- */
   function visible() {
@@ -118,10 +144,10 @@
       bar.hidden = false;
       bar.querySelector('[data-mode="any"]').setAttribute('aria-pressed', String(state.tagMode === 'any'));
       bar.querySelector('[data-mode="all"]').setAttribute('aria-pressed', String(state.tagMode === 'all'));
-      $('#tagFilterCount').textContent = state.tags.length + ' labels';
+      $('#tagFilterCount').textContent = T2('{n} labels', { n: state.tags.length });
     } else bar.hidden = true;
 
-    $('#libCount').textContent = list.length + ' passages' + (state.tags.length ? ' (filtered)' : '');
+    $('#libCount').textContent = T2('{n} passages', { n: list.length }) + (state.tags.length ? T(' (filtered)') : '');
     $('#empty').hidden = list.length > 0;
     $('#list').innerHTML = list.map(cardHtml).join('');
   }
@@ -323,6 +349,7 @@
     $('#editLearn').checked = s.learn !== false;
     $('#editKnown').checked = !!s.known;
     $('#editSheet').hidden = false;
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   bindPicker($('#editPicker'));
   $('#editClose').addEventListener('click', () => { $('#editSheet').hidden = true; });
@@ -384,12 +411,14 @@
   function openStudy() {
     state.study = { queue: buildQueue(), i: 0, revealed: false, done: 0 };
     if (!state.study.queue.length) showDone(true); else { $('#studyDone').hidden = true; renderStudyCard(); }
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   function showDone(nothing) {
     $('#studyStage').innerHTML = ''; $('#studyDone').hidden = false; $('#studyProgress').textContent = '';
     const st = NN.studyStats(state.notes);
     $('#doneTitle').textContent = nothing && !state.study.done ? 'Nothing due right now' : 'All caught up!';
-    $('#doneBody').textContent = (state.study.done ? 'Reviewed ' + state.study.done + ' passages. ' : '') + st.studying + ' in the schedule, ' + st.due + ' due.';
+    $('#doneBody').textContent = (state.study.done ? T2('Reviewed {n} passages. ', { n: state.study.done }) : '')
+      + T2('{lich} in the schedule, {han} due.', { lich: st.studying, han: st.due });
   }
   function renderStudyCard() {
     const n = state.study.queue[state.study.i];
@@ -481,6 +510,7 @@
     $('#activePicker').innerHTML =
       `<button type="button" class="lchip" data-active="" aria-pressed="${!active}">None</button>` +
       labels.map(l => `<button type="button" class="lchip" data-active="${esc(l.name)}" aria-pressed="${active === l.name}">${labelDot(l.color)}${esc(l.name)}</button>`).join('');
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   function persistLabels(labels, activeLabel) {
     const patch = { labels }; if (activeLabel !== undefined) patch.activeLabel = activeLabel;
@@ -548,6 +578,7 @@
     $('#stat').textContent = all.length + ' passages · ' + st.studying + ' in study · ' + st.due + ' due' + (s.lastSync ? ' · synced ' + when(s.lastSync) + ' ago' : '');
     $('#setMsg').textContent = '';
     $('#setSheet').hidden = false;
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   $('#btnSettings').addEventListener('click', openSettings);
   $('#setClose').addEventListener('click', saveSettingsClose);
@@ -596,7 +627,7 @@
               : null))
             .then(() => NN.saveSettings({ lastSync: Date.now() }))
             .then(() => load())
-            .then(() => toast('Synced · ' + NN.live(m.notes).length + ' passages'));
+            .then(() => toast(T2('Synced · {n} passages', { n: NN.live(m.notes).length })));
         });
       })
     ).catch(err => { toast('Sync error: ' + (err.message || err)); }).then(() => { syncing = false; });
@@ -713,13 +744,14 @@
       const view = NN.progressOverview(NN.normalizeProgress(raw), {});
       const pill = $('#progStreak');
       if (pill) {
-        pill.textContent = (view.streak.current ? view.streak.current + '-day streak · ' : '')
-          + view.today.reviews + '/' + view.goal + ' today';
+        // Ghi thẳng vào chip nên đè lên bản đã dịch — chữ ở đây phải tự qua T2().
+        pill.textContent = (view.streak.current ? T2('{n}-day streak · ', { n: view.streak.current }) : '')
+          + T2('{da}/{dich} today', { da: view.today.reviews, dich: view.goal });
       }
     }).catch(() => {});
   }
 
-  function drawProgress() { return NN.renderProgress($('#progressBody'), progressIo); }
+  function drawProgress() { return Promise.resolve(NN.renderProgress($('#progressBody'), progressIo)).then((x) => { veChu(); return x; }); }
 
   /* ---------------- TABS ---------------- */
   function switchTab(tab) {
@@ -753,7 +785,9 @@
   }
 
   /* ---------------- STARTUP ---------------- */
-  load().then(() => {
+  // napChu TRƯỚC load: câu có chỗ trống được ghép ngay lúc vẽ, nên phải biết
+  // thứ tiếng trước lượt vẽ đầu tiên.
+  napChu().then(() => load()).then(() => {
     checkIncoming();
     updateStreakPill();
     // Some milestones depend only on how big the notebook is, and it can grow
