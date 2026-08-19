@@ -2,6 +2,14 @@
 (function () {
   'use strict';
 
+  /* Thiếu chu.js thì cứ chạy bằng chữ gốc, đừng chết. */
+  const T = window.T || (x => x);
+  const T2 = window.T2 || ((x, thay) => {
+    let r = x;
+    for (const k in (thay || {})) r = r.split('{' + k + '}').join(thay[k]);
+    return r;
+  });
+
   const $ = s => document.querySelector(s);
   const esc = NN.escapeHtml;
 
@@ -20,13 +28,15 @@
     if (!ts) return '';
     const d = Date.now() - ts;
     const m = Math.floor(d / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + ' min ago';
+    // Mốc thời gian ghép sẵn thành câu nên lượt quét DOM không vá được — chữ ở
+    // đây phải tự đi qua T2().
+    if (m < 1) return T('just now');
+    if (m < 60) return T2('{n} min ago', { n: m });
     const h = Math.floor(m / 60);
-    if (h < 24) return h + ' h ago';
+    if (h < 24) return T2('{n} h ago', { n: h });
     const day = Math.floor(h / 24);
-    if (day < 7) return day + ' days ago';
-    return new Date(ts).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    if (day < 7) return T2('{n} days ago', { n: day });
+    return new Date(ts).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   /* ---------- load data ---------- */
@@ -35,6 +45,7 @@
       state.notes = r.notes;
       state.settings = r.settings;
       render();
+      veChu();          // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh — dịch lại ngay
       paintSync();
       // blobs whose note is gone would otherwise sit on disk forever
       if (window.NNFiles) NNFiles.sweep(state.notes).catch(() => {});
@@ -75,7 +86,7 @@
     const list = visible();
     const all = NN.live(state.notes);
 
-    $('#count').textContent = list.length + ' passages';
+    $('#count').textContent = T2('{n} passages', { n: list.length });
     $('#crumb').textContent = state.tags.length ? state.tags.map(t => '#' + t).join(state.tagMode === 'all' ? ' + ' : ' / ')
       : state.site ? state.site
       : state.q ? 'Search results' : 'All';
@@ -230,7 +241,7 @@
   function studyToggleLabel(n) {
     const s = n.srs || {};
     if (s.known) return 'Study again';
-    return s.learn === false ? 'Back to study' : 'Snooze';
+    return s.learn === false ? T('Back to study') : T('Snooze');
   }
 
   function cardHtml(n) {
@@ -397,7 +408,7 @@
         let msg;
         if (s.known) { s.known = false; s.learn = true; msg = 'Back to study'; }
         else if (s.learn === false) { s.learn = true; msg = 'Back to study'; }
-        else { s.learn = false; msg = 'Snoozed from study'; }
+        else { s.learn = false; msg = T('Snoozed from study'); }
         NN.putNote(next).then(() => { state.notes[id] = next; render(); toast(msg); autoSync(); });
         break;
       }
@@ -831,6 +842,7 @@
     // set the default color for the new-label input
     const first = $('#newLabelColors .sw');
     if (first) first.setAttribute('aria-pressed', 'true');
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
 
   function persistLabels(labels, activeLabel) {
@@ -930,6 +942,7 @@
     $('#stat').textContent = all.length + ' saved passages · ' + tombs + ' pending deletions';
     $('#sheetMsg').textContent = '';
     $('#sheet').hidden = false;
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   $('#btnSettings').addEventListener('click', openSheet);
   $('#sheetClose').addEventListener('click', () => { $('#sheet').hidden = true; });
@@ -960,16 +973,16 @@
     const dot = $('#syncDot'), txt = $('#syncText');
     dot.className = 'sync-dot' + (cls ? ' ' + cls : '');
     if (msg) { txt.textContent = msg; return; }
-    if (!state.settings.syncUrl) { txt.textContent = 'Sync is off'; return; }
+    if (!state.settings.syncUrl) { txt.textContent = T('Sync is off'); return; }
     dot.classList.add('on');
     txt.textContent = state.settings.lastSync
-      ? 'Synced ' + when(state.settings.lastSync)
-      : 'Ready to sync';
+      ? T2('Synced {khi}', { khi: when(state.settings.lastSync) })
+      : T('Ready to sync');
   }
 
   function doSync() {
     if (!state.settings.syncUrl) { openSheet(); return; }
-    paintSync('Syncing…', 'busy');
+    paintSync(T('Syncing…'), 'busy');
     chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, res => {
       if (!res || !res.ok) {
         paintSync('Sync error', 'err');
@@ -1059,12 +1072,14 @@
       const view = NN.progressOverview(NN.normalizeProgress(raw), {});
       const btn = $('#btnProgress');
       if (!btn) return;
+      // Hàm này ghi thẳng vào nút, tức là nó đè lên bản đã dịch của lượt quét
+      // trước — nên chữ ở đây phải tự đi qua T().
       btn.textContent = view.streak.current
-        ? 'Progress · ' + view.streak.current + 'd'
-        : 'Progress';
+        ? T2('Progress · {n}d', { n: view.streak.current })
+        : T('Progress');
       btn.title = view.today.met
-        ? "Today's goal is done"
-        : view.today.reviews + ' of ' + view.goal + ' reviews today';
+        ? T("Today's goal is done")
+        : T2('{da} of {dich} reviews today', { da: view.today.reviews, dich: view.goal });
     }).catch(() => {});
   }
 
@@ -1073,6 +1088,7 @@
   function openProgress() {
     $('#progressSheet').hidden = false;
     drawProgress();
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   function closeProgress() { $('#progressSheet').hidden = true; }
 
@@ -1108,6 +1124,7 @@
     $('#study').hidden = false;
     if (!study.queue.length) showStudyDone(true);
     else { $('#studyDone').hidden = true; renderStudyCard(); }
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
   function closeStudy() { $('#study').hidden = true; load(); }
 
@@ -1180,6 +1197,7 @@
           <button class="btn link" data-st="known">Mastered</button>
         </div>
       </div>`;
+    veChu();   // DOM vừa dựng lại từ chuỗi mẫu tiếng Anh
   }
 
   function advance() {
@@ -1293,7 +1311,7 @@
       if (act === 'hide') next.srs.learn = false; else next.srs.known = true;
       next.updatedAt = Date.now();
       NN.putNote(next).then(() => { state.notes[next.id] = next; autoSync(); });
-      toast(act === 'hide' ? 'Snoozed from study' : 'Marked as mastered');
+      toast(act === 'hide' ? T('Snoozed from study') : T('Marked as mastered'));
       advance();
       return;
     }
@@ -1351,11 +1369,42 @@
   // Test hook for the jsdom suite (same idea as window.__NN_APP__ in the Android app).
   window.__NN_MATH__ = mathHtml;
 
+  /* ---------- ngôn ngữ giao diện ----------
+     Giao diện ở đây dựng bằng chuỗi mẫu HTML rồi gán vào innerHTML, nên thay vì
+     đi sửa vài trăm chỗ trong chuỗi mẫu, cứ QUÉT lại cây DOM sau mỗi lượt vẽ.
+     Chu.quet() chỉ đụng vào chuỗi CÓ TRONG BẢNG và chừa hẳn mọi vùng chứa chữ
+     của người dùng ra — xem chu.js. */
+  function veChu() { if (window.Chu) Chu.quet(document.body); }
+
+  async function napChu() {
+    // Thiếu chu.js thì app vẫn phải chạy được bằng tiếng Anh, đừng chết ở đây.
+    if (!window.Chu) return;
+    const st = await new Promise(r => chrome.storage.local.get('settings', x => r((x && x.settings) || {})));
+    const c = Chu.hopLe(st.chu);
+    const o = $('#chuNgu');
+    if (o) o.value = c;
+    Chu.dat(c, document.body);
+  }
+  document.addEventListener('change', e => {
+    const o = e.target.closest && e.target.closest('#chuNgu');
+    if (!o || !window.Chu) return;
+    const c = Chu.hopLe(o.value);
+    chrome.storage.local.get('settings', x => {
+      chrome.storage.local.set({ settings: Object.assign({}, x.settings || {}, { chu: c }) }, () => {
+        // Vẽ lại từ chữ GỐC: quét trên bản đã dịch thì không tra ra khoá nào nữa.
+        location.reload();
+      });
+    });
+  });
+
   /* ---------- startup ---------- */
   chrome.storage.onChanged.addListener(ch => {
     if (ch.notes || ch.settings) load();
   });
-  load().then(() => {
+  // napChu TRƯỚC load: những câu có chỗ trống (T2) được tính ngay lúc vẽ, nên
+  // phải biết thứ tiếng trước lượt vẽ đầu tiên. Lượt quét DOM chỉ vá được chữ
+  // tĩnh, không vá được "1 passages" đã ghép xong.
+  napChu().then(() => load()).then(() => {
     if (location.hash === '#settings' || location.hash === '#labels') openSheet();
     if (location.hash === '#labels') setTimeout(() => $('#newLabelName') && $('#newLabelName').focus(), 80);
     if (location.hash === '#study') setTimeout(openStudy, 60);

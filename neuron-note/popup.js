@@ -1,6 +1,14 @@
 /* Neuron Note — popup */
 (function () {
   'use strict';
+
+  /* Thiếu chu.js thì cứ chạy bằng chữ gốc, đừng chết. */
+  const T = window.T || (x => x);
+  const T2 = window.T2 || ((x, thay) => {
+    let r = x;
+    for (const k in (thay || {})) r = r.split('{' + k + '}').join(thay[k]);
+    return r;
+  });
   const $ = s => document.querySelector(s);
   const esc = NN.escapeHtml;
   let tab = null;
@@ -29,8 +37,8 @@
   }
   function updateCta() {
     $('#saveBtn').textContent = activeLabel
-      ? 'Save to #' + activeLabel
-      : 'Save selected passage';
+      ? T2('Save to #{nhan}', { nhan: activeLabel })
+      : T('Save selected passage');
   }
 
   $('#labelsPick').addEventListener('click', e => {
@@ -40,6 +48,11 @@
     $('#labelsPick').querySelectorAll('.lp').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     updateCta();
     NN.saveSettings({ activeLabel });   // remember the choice for next time + shortcut
+  });
+
+  /* Ngôn ngữ giao diện: đặt bên màn Thư viện, popup chỉ đọc theo. */
+  chrome.storage.local.get('settings', r => {
+    if (window.Chu) Chu.dat(Chu.hopLe(((r && r.settings) || {}).chu), document.body);
   });
 
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
@@ -58,11 +71,11 @@
       const here = all.filter(n => NN.normalizeUrl(n.url) === key);
       const show = here.length ? here : all.slice(0, 6);
 
-      $('#head').textContent = here.length ? 'On this page · ' + here.length
-        : all.length ? 'Recently saved' : 'No passages yet';
+      $('#head').textContent = here.length ? T2('On this page · {n}', { n: here.length })
+        : all.length ? T('Recently saved') : T('No passages yet');
       $('#none').hidden = show.length > 0;
       if (!all.length) {
-        $('#none').textContent = 'No passages saved yet. Select text → right-click → Save to Neuron Note, pick a label.';
+        $('#none').textContent = T('No passages saved yet. Select text → right-click → Save to Neuron Note, pick a label.');
       }
       $('#list').innerHTML = show.map(n => `
         <li class="item" data-id="${esc(n.id)}" data-url="${esc(n.fragUrl || n.url)}">
@@ -100,16 +113,16 @@
     chrome.runtime.sendMessage({ type: 'OPEN_LIBRARY', hash: '#study' }, () => window.close());
   });
   $('#syncBtn').addEventListener('click', () => {
-    $('#syncBtn').textContent = 'Syncing…';
+    $('#syncBtn').textContent = T('Syncing…');
     chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, res => {
       if (res && res.ok) {
-        $('#syncBtn').textContent = 'Done';
-        $('#stat').textContent = res.total + ' passages · just synced';
+        $('#syncBtn').textContent = T('Done');
+        $('#stat').textContent = T2('{n} passages · just synced', { n: res.total });
       } else {
-        $('#syncBtn').textContent = 'Error';
-        $('#stat').textContent = (res && res.error) || 'Could not connect';
+        $('#syncBtn').textContent = T('Error');
+        $('#stat').textContent = (res && res.error) || T('Could not connect');
       }
-      setTimeout(() => { $('#syncBtn').textContent = 'Sync'; }, 1800);
+      setTimeout(() => { $('#syncBtn').textContent = T('Sync'); }, 1800);
     });
   });
 })();

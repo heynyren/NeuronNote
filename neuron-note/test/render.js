@@ -37,6 +37,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const ctx = dom.getInternalVMContext();
   vm.runInContext(read('vendor/katex/katex.min.js'), ctx, { filename:'katex.min.js' });
   ok('KaTeX nạp được', typeof w.katex === 'object' && typeof w.katex.renderToString === 'function');
+  vm.runInContext(read('chu-bang.js'), ctx, { filename:'chu-bang.js' });
+  vm.runInContext(read('chu.js'), ctx, { filename:'chu.js' });
   vm.runInContext(read('shared.js'), ctx, { filename:'shared.js' });
   vm.runInContext(read('notes.js'), ctx, { filename:'notes.js' });
   await sleep(60);
