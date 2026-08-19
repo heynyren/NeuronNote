@@ -69,6 +69,7 @@
       <h1 id="count">0 passages</h1>
     </div>
     <div class="topbar-actions">
+      <button class="btn" id="btnNew">＋ New note</button>
       <button class="btn study-btn" id="btnStudy">Study <span class="due-pill" id="duePill" hidden>0</span></button>
       <select id="sort" aria-label="Sort">
         <option value="new">Newest</option>
@@ -80,6 +81,28 @@
       <input type="file" id="fileInput" accept="application/json" hidden>
     </div>
   </header>
+
+  <!-- Soạn một ghi chú của riêng mình, không phải chép từ trang nào.
+       App điện thoại có sẵn tab "Add" cho việc này; bên extension trước đây
+       muốn ghi một ý nghĩ của mình thì phải gõ ra đâu đó rồi bôi đen mà lưu. -->
+  <section id="compose" class="compose" hidden>
+    <div class="editor">
+      <label class="editor-lbl">Passage</label>
+      <textarea class="ed-body" id="newBody" rows="4" placeholder="Type or paste the passage…"></textarea>
+      <label class="editor-lbl">Your note</label>
+      <textarea class="ed-note" id="newNote" placeholder="Your note…"></textarea>
+      <label class="editor-lbl">Labels</label>
+      <div class="lbl-picker" id="newPicker"></div>
+      <div class="study-ctl">
+        <label class="mini-check"><input type="checkbox" id="newLearn" checked> Add to study schedule</label>
+      </div>
+      <div class="row">
+        <div class="swatches" id="newColors"></div>
+        <button class="btn sm" id="newSave">Save</button>
+        <button class="btn ghost sm" id="newCancel">Cancel</button>
+      </div>
+    </div>
+  </section>
 
   <section id="list" class="list"></section>
 

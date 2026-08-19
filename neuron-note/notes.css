@@ -244,6 +244,13 @@ select {
   font: 14px/1.5 var(--sans); background: #FFF; color: var(--ink); margin-bottom: 8px;
 }
 .editor textarea { min-height: 64px; resize: vertical; }
+/* Khung soạn một ghi chú của riêng mình, nằm ngay trên danh sách. */
+.compose { margin: 0 0 16px; }
+.compose[hidden] { display: none; }
+.compose .editor { display: block; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; }
+.compose .editor-lbl:first-child { margin-top: 0; }
+
 .editor-lbl { display: block; font: 600 9px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 2px 0 6px; }
 .lbl-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; align-items: center; }
 .lchip {
@@ -307,6 +314,10 @@ kbd {
 .srs.off { background: #EEE; color: #9A9A93; }
 
 /* công tắc học trong trình sửa */
+/* `.editor input { width: 100% }` phía trên vơ luôn cả ô tích, làm nó phình ra
+   chiếm hết dòng và bóp nhãn chữ xuống thành ba dòng. Ô tích thì cứ để nguyên
+   cỡ của nó. */
+.editor input[type="checkbox"] { width: auto; margin: 0; }
 .study-ctl { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; }
 .mini-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); cursor: pointer; }
 .mini-check input { accent-color: var(--signal); }

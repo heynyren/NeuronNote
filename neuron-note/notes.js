@@ -551,6 +551,112 @@
 
   function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
+  /* ---------- soạn một ghi chú của riêng mình ----------
+     App điện thoại có sẵn tab "Add" cho việc này. Bên extension trước đây chỉ
+     lưu được đoạn bôi đen trên một trang nào đó, nên muốn ghi một ý nghĩ của
+     mình thì phải gõ nó ra đâu đó rồi bôi đen mà lưu — vòng vo và vô lý. */
+  const COMPOSE = $('#compose');
+
+  function veCompose() {
+    $('#newPicker').innerHTML = pickerHtml({ tags: [] });
+    $('#newColors').innerHTML = ['amber', 'mint', 'sky', 'rose', 'lilac'].map(c =>
+      `<button class="sw" data-color="${c}" style="background:var(--${c})" aria-pressed="${c === (state.settings.markColor || 'amber')}" title="${NN.COLOR_LABEL[c]}"></button>`).join('');
+  }
+  function moCompose() {
+    veCompose();
+    $('#newBody').value = ''; $('#newNote').value = ''; $('#newLearn').checked = true;
+    COMPOSE.hidden = false;
+    $('#newBody').focus();
+  }
+  function dongCompose() { COMPOSE.hidden = true; }
+
+  $('#btnNew').addEventListener('click', () => { COMPOSE.hidden ? moCompose() : dongCompose(); });
+  $('#newCancel').addEventListener('click', dongCompose);
+
+  // Bộ chọn nhãn và bảng màu trong khung soạn cư xử y như trong khung sửa.
+  COMPOSE.addEventListener('click', e => {
+    const chip = e.target.closest('.lbl-picker .lchip');
+    if (chip && !chip.classList.contains('add')) {
+      chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true'));
+      return;
+    }
+    if (e.target.closest('.lchip.add')) {
+      const inp = e.target.closest('.lchip-add').querySelector('.lchip-input');
+      inp.hidden = false; inp.focus();
+      return;
+    }
+    const sw = e.target.closest('.sw');
+    if (sw) sw.parentNode.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', String(x === sw)));
+  });
+  COMPOSE.addEventListener('keydown', e => {
+    const inp = e.target.closest && e.target.closest('.lchip-input');
+    if (!inp) return;
+    if (e.key === 'Escape') { inp.hidden = true; inp.value = ''; return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const name = NN.squash(inp.value);
+    if (!name) return;
+    const picker = inp.closest('.lbl-picker');
+    const co = picker.querySelector('.lchip[data-name="' + cssq(name) + '"]');
+    if (co) co.setAttribute('aria-pressed', 'true');
+    else {
+      const color = NN.nextLabelColor(state.settings);
+      const chip = document.createElement('button');
+      chip.type = 'button'; chip.className = 'lchip new'; chip.dataset.name = name;
+      chip.setAttribute('aria-pressed', 'true');
+      chip.innerHTML = '<span class="ldot" style="background:var(--' + esc(color) + ')"></span>' + esc(name);
+      inp.closest('.lchip-add').before(chip);
+    }
+    inp.value = ''; inp.hidden = true;
+  });
+
+  $('#newSave').addEventListener('click', () => {
+    // Đoạn văn là bắt buộc; ghi chú riêng thì không. Chép công thức từ PDF hay
+    // từ trang đã render vào đây thì đưa qua toStandardMath như lúc bắt trên
+    // trang, để nó hiện ra công thức chứ không phải một mớ ký tự.
+    const raw = $('#newBody').value.trim();
+    if (!raw) { $('#newBody').focus(); toast('Type something first'); return; }
+    const std = NN.toStandardMath(raw);
+    const tags = Array.from(COMPOSE.querySelectorAll('.lbl-picker .lchip[aria-pressed="true"]'))
+      .map(c => c.dataset.name).filter(Boolean);
+    const newLabels = tags.filter(t =>
+      !(state.settings.labels || []).some(l => l.name === t)
+      && COMPOSE.querySelector('.lbl-picker .lchip[data-name="' + cssq(t) + '"].new'));
+    const picked = COMPOSE.querySelector('#newColors .sw[aria-pressed="true"]');
+    const now = Date.now();
+    const note = {
+      id: NN.uid(),
+      text: std,
+      // Chỉ giữ bản LaTeX khi trong đó thật sự có công thức — xem NN.applyBodyEdit.
+      rich: NN.hasMath(std) ? std : '',
+      note: $('#newNote').value.trim(),
+      tags,
+      color: picked ? picked.dataset.color : (state.settings.markColor || 'amber'),
+      // Ghi chú tự viết thì không có trang nguồn, nên cũng không có link neo.
+      url: '', title: '', prefix: '', suffix: '',
+      createdAt: now, updatedAt: now, deleted: false,
+      srs: NN.freshSrs(now)
+    };
+    if (!$('#newLearn').checked) note.srs.learn = false;
+
+    const afterSettings = newLabels.length
+      ? NN.saveSettings({ labels: NN.withNewLabels(state.settings, newLabels) }).then(s => { state.settings = s; })
+      : Promise.resolve();
+
+    afterSettings
+      .then(() => NN.putNote(note))
+      .then(() => {
+        state.notes[note.id] = note;
+        dongCompose();
+        render();
+        toast('Saved');
+        // Đếm vào "hôm nay lưu bao nhiêu". Hỏng ở đây thì cũng không được kéo
+        // việc lưu xuống theo — ghi chú mới là thứ đáng giá, con số thì không.
+        NN.recordSaved(1).catch(() => {});
+        autoSync();
+      });
+  });
+
   // create a new label right in the editor (Enter)
   $('#list').addEventListener('keydown', e => {
     const inp = e.target.closest && e.target.closest('.lchip-input');
