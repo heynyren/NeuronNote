@@ -172,6 +172,23 @@ button, input, textarea { font-family: inherit; }
 .st-reveal[hidden] { display: none; }
 .st-note { margin: 0 0 10px; white-space: pre-wrap; }
 .st-note.muted { color: var(--muted); font-style: italic; }
+
+/* ---------- công thức (KaTeX) ---------- */
+/* Giống hệt extension: một ghi chú chép ở đó phải đọc ra y như vậy ở đây. */
+/* Công thức dài phải cuộn trong hộp của nó, chứ không kéo giãn cả thẻ. */
+.q .katex-display, .st-quote .katex-display,
+.mynote .katex-display, .st-note .katex-display {
+  overflow-x: auto; overflow-y: hidden; padding: 2px 0; margin: .5em 0;
+}
+.katex { font-size: 1.05em; }
+.st-quote .katex { font-size: 1em; }
+/* KaTeX vẽ chữ đứng, còn đoạn văn quanh nó là serif nghiêng — bỏ nghiêng đi. */
+.q .katex, .st-quote .katex { font-style: normal; }
+/* LaTeX mà KaTeX không đọc được — hiện luôn mã nguồn, đừng nuốt mất. */
+.tex-raw {
+  font: 12px var(--mono); background: #F0EFE8; border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 5px; color: var(--danger); font-style: normal;
+}
 .st-open { font: 12px var(--mono); color: var(--signal); text-decoration: none; }
 .st-actions { margin-top: 18px; display: flex; gap: 10px; }
 .st-actions .btn { flex: 1; padding: 13px; }

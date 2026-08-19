@@ -72,6 +72,31 @@
 
   function labelColorOf(name) { return NN.labelColor(state.settings, name); }
 
+  /* ---------- math ----------
+     Escape the prose, hand the formulas to KaTeX. KaTeX builds its own markup so
+     its output goes in unescaped; every other piece is escaped as usual. A
+     formula KaTeX rejects falls back to its LaTeX source rather than vanishing.
+     Same code as the extension: a note captured there must read the same here. */
+  function mathHtml(s) {
+    const src = String(s || '');
+    if (!src) return '';
+    const parts = NN.splitMath(src);
+    if (!window.katex || !parts.some(p => p.type === 'math')) return esc(src);
+    return parts.map(p => {
+      if (p.type === 'text') return esc(p.value);
+      try {
+        return katex.renderToString(p.value, {
+          displayMode: p.display, throwOnError: false, output: 'html'
+        });
+      } catch (e) {
+        return `<code class="tex-raw">${esc(p.value)}</code>`;
+      }
+    }).join('');
+  }
+
+  /** The passage to show: the LaTeX copy when the page had formulas, else the plain text. */
+  function bodyOf(n) { return n.rich || n.text || ''; }
+
   function renderLib() {
     const all = NN.live(state.notes);
     const list = visible();
@@ -109,8 +134,8 @@
     const s = n.srs || {};
     const toggleTxt = s.known ? 'Study again' : (s.learn === false ? 'To study' : 'Snooze');
     return `<div class="note" data-id="${esc(n.id)}" data-color="${esc(n.color || 'amber')}">
-      <p class="q">${esc(n.text)}</p>
-      ${NN.squash(n.note) ? `<p class="mynote">${esc(n.note)}</p>` : ''}
+      <p class="q">${mathHtml(bodyOf(n))}</p>
+      ${NN.squash(n.note) ? `<p class="mynote">${mathHtml(n.note)}</p>` : ''}
       ${tags ? `<div class="tagrow">${tags}</div>` : ''}
       <div class="meta">
         <span>${esc(NN.hostOf(n.url) || 'note')}</span><span>·</span><span>${when(n.createdAt)}</span>
@@ -376,10 +401,10 @@
     $('#studyStage').innerHTML = `
       <div class="study-card" data-color="${esc(n.color || 'amber')}">
         <div class="st-meta">${esc(NN.hostOf(n.url) || 'note')} · level ${s.box || 0} · reviewed ${s.reps || 0} times</div>
-        <blockquote class="st-quote">${esc(n.text)}</blockquote>
+        <blockquote class="st-quote">${mathHtml(bodyOf(n))}</blockquote>
         ${tags ? `<div class="st-tags">${tags}</div>` : ''}
         <div class="st-reveal" hidden>
-          ${NN.squash(n.note) ? `<p class="st-note">${esc(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
+          ${NN.squash(n.note) ? `<p class="st-note">${mathHtml(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
           ${isHttp(n.url) ? `<a class="st-open" data-open>Open source passage ↗</a>` : ''}
         </div>
         <button class="btn ghost st-reveal-btn" data-st="reveal">Show note</button>
