@@ -813,6 +813,44 @@
   };
 
   /* ---------- sync merge: newer wins ---------- */
+  /** Mốc của lần CHẤM BÀI gần nhất. Bản cũ chưa có `last` thì mượn `updatedAt`. */
+  function reviewedAt(n) {
+    const s = n && n.srs;
+    if (!s) return -1;
+    return (typeof s.last === 'number' && s.last) ? s.last : (n.updatedAt || 0);
+  }
+
+  /**
+   * Merge the review SCHEDULE of two copies of one note, separately from the
+   * note itself.
+   *
+   * Why it has to be separate: the merge normally takes whichever copy has the
+   * newer `updatedAt` and keeps it whole. For the words you wrote that is
+   * right — your later edit is your latest intent. But the review schedule is
+   * not something you typed; the app writes it when you grade a card, and two
+   * machines grade at different moments. Grade on the phone up to level 5, then
+   * fix a typo on the desktop: the desktop copy is newer so it wins whole, and
+   * level 5 quietly drops back to level 1. Losing review work in silence is the
+   * worst way to lose it.
+   *
+   * So the scheduling fields are compared on their own clock, `srs.last`.
+   * `learn` and `known` stay with the record winner on purpose: snoozing a note
+   * or marking it mastered is something YOU do, and it does not touch
+   * `srs.last`, so it must not travel with the schedule.
+   *
+   * Only merged between two live notes that both carry a schedule. A tombstone
+   * deliberately carries none.
+   */
+  const SRS_LICH = ['box', 'due', 'reps', 'lapses', 'last'];
+  function mergeSrs(win, lose) {
+    if (!win || !lose || win.deleted || lose.deleted) return win;
+    if (!win.srs || !lose.srs) return win;
+    if (reviewedAt(lose) <= reviewedAt(win)) return win;
+    const s = Object.assign({}, win.srs);
+    SRS_LICH.forEach(k => { if (lose.srs[k] !== undefined) s[k] = lose.srs[k]; });
+    return Object.assign({}, win, { srs: s });
+  }
+
   NN.merge = function (local, remote) {
     const out = {};
     const ids = new Set([...Object.keys(local || {}), ...Object.keys(remote || {})]);
@@ -822,8 +860,8 @@
       const b = (remote || {})[id];
       if (!a) { out[id] = b; added++; return; }
       if (!b) { out[id] = a; return; }
-      if ((b.updatedAt || 0) > (a.updatedAt || 0)) { out[id] = b; updated++; }
-      else out[id] = a;
+      if ((b.updatedAt || 0) > (a.updatedAt || 0)) { out[id] = mergeSrs(b, a); updated++; }
+      else out[id] = mergeSrs(a, b);
     });
     // clean up expired tombstones
     const now = Date.now();
