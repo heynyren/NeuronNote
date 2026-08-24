@@ -935,6 +935,7 @@
     $('#syncKey').value = s.syncKey || '';
     $('#autoSync').checked = s.autoSync !== false;
     $('#autoHighlight').checked = s.autoHighlight !== false;
+    if ($('#ytAuto')) $('#ytAuto').checked = !!s.ytTuBat;
     $('#markColor').value = s.markColor || 'amber';
     renderLabelEditor();
     const all = NN.live(state.notes);
@@ -959,6 +960,7 @@
       syncKey: $('#syncKey').value.trim(),
       autoSync: $('#autoSync').checked,
       autoHighlight: $('#autoHighlight').checked,
+      ytTuBat: $('#ytAuto') ? $('#ytAuto').checked : false,
       markColor: $('#markColor').value
     }).then(s => {
       state.settings = s;

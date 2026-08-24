@@ -576,13 +576,30 @@
     songNgu: false,
     co: 2,              // nấc cỡ chữ đang dùng
     dich: new Map(),    // chỉ số câu -> bản dịch
-    host: null, root: null, oList: null, oTrong: null
+    host: null, root: null, oList: null, oTrong: null,
+    hostBat: null       // nút mời "Hiện phụ đề" ở chế độ đợi
   };
 
   /** Số lần bấm Nạp lại mà bảng vẫn chưa ra chữ. */
   let soLanNap = 0;
   /** Mã video mà bạn đã tự đóng bảng — đừng dựng lại cho tới khi sang video khác. */
   let tatCho = "";
+  /*
+   * Tự bật bảng khi mở video, hay đợi người dùng bấm?
+   *
+   * Mặc định là ĐỢI: mỗi lần lấy phụ đề rồi dịch cả bảng là một loạt lượt gọi
+   * API — bật tự động cho MỌI video, kể cả video chỉ lướt qua, là đốt hạn mức
+   * dịch vô ích. Video mới chỉ hiện một nút mời; bấm mới lấy phụ đề và gọi dịch.
+   */
+  let tuBat = false;
+  /** Mã video đang chờ người dùng bấm nút mời. "" là không chờ ai. */
+  let choBat = "";
+  const datBat = (st) => {
+    const moi = !!(st && st.ytTuBat);
+    if (moi === tuBat) return false;
+    tuBat = moi;
+    return true;
+  };
 
   /*
    * Ngôn ngữ giao diện. Bảng nằm trong shadow DOM do JS dựng ra nên lượt quét
@@ -600,11 +617,19 @@
   let baoDaDoc;
   const daDocCaiDat = new Promise((giai) => { baoDaDoc = giai; });
   chrome.storage.local.get("settings", (r) => {
-    datChu((r && r.settings) || {});
+    const st = (r && r.settings) || {};
+    datChu(st);
+    datBat(st);
     baoDaDoc();
   });
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === "local" && ch.settings) datChu(ch.settings.newValue || {});
+    if (area !== "local" || !ch.settings) return;
+    const st = ch.settings.newValue || {};
+    datChu(st);
+    if (datBat(st)) {
+      const v = maVideo();
+      if (v && v !== tatCho) xemLai(true);
+    }
   });
 
   /**
@@ -1501,6 +1526,52 @@
     } finally { dangNgong = false; }
   }
 
+  /** Gỡ nút mời (nếu có). Tách khỏi bảng chính nên phải dọn riêng. */
+  function goMoiBat() { if (S.hostBat) { S.hostBat.remove(); S.hostBat = null; } }
+
+  /**
+   * Chế độ ĐỢI: chỉ hiện một nút mời thay vì lấy phụ đề và dịch ngay. Bấm mới
+   * chạy khoiDong — tức là mới tốn lượt gọi API.
+   */
+  function moiBat(v) {
+    goMoiBat(); goBang();
+    const noi = choDat();
+    if (!noi) return;
+    choBat = v;
+    const host = document.createElement("div");
+    host.setAttribute("data-nnote-yt", "1");
+    host.style.cssText = "all:initial;display:block;margin-bottom:16px";
+    const root = host.attachShadow({ mode: "open" });
+    const stEl = document.createElement("style"); stEl.textContent = CSS; root.appendChild(stEl);
+    const box = document.createElement("div"); box.className = "box"; root.appendChild(box);
+
+    const top = document.createElement("div"); top.className = "top";
+    const lg = document.createElement("img"); lg.className = "lg"; lg.src = LOGO; lg.alt = ""; lg.width = 18; lg.height = 18;
+    top.appendChild(lg);
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = T("Neuron Note · Lời thoại");
+    top.appendChild(nm);
+    const spacer = document.createElement("span"); spacer.className = "n"; top.appendChild(spacer);
+    const nutX = nutChip("x", "", T("Ẩn cho video này"));
+    top.appendChild(nutX);
+    box.appendChild(top);
+
+    const body = document.createElement("div");
+    body.style.cssText = "padding:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start";
+    const nutBat = nutChip("subtitles", T("Hiện phụ đề & dịch"), "");
+    nutBat.style.cssText = "padding:9px 15px;font-size:14px";
+    const tip = document.createElement("div");
+    tip.style.cssText = "font-size:12px;opacity:.66;line-height:1.5";
+    tip.textContent = T("Để tiết kiệm, bảng chỉ lấy phụ đề và gọi dịch khi bạn bấm.");
+    body.appendChild(nutBat); body.appendChild(tip);
+    box.appendChild(body);
+
+    noi.insertBefore(host, noi.firstChild);
+    S.hostBat = host;
+
+    nutBat.addEventListener("click", () => { choBat = ""; goMoiBat(); khoiDong(v); });
+    nutX.addEventListener("click", () => { choBat = ""; tatCho = v; goMoiBat(); });
+  }
+
   async function khoiDong(v) {
     await daDocCaiDat;      // đừng dựng bảng bằng thứ tiếng chưa biết là gì
     S.v = v; S.cau = []; S.hien = -1; S.dich.clear(); S.bam = true;
@@ -1552,7 +1623,8 @@
     const v = maVideo();
     if (ep) tatCho = "";              // tự bấm Nạp lại thì tất nhiên là muốn bảng hiện lại
     if (v && v === tatCho) return;    // video này bạn đã đóng bảng
-    if (!v) { dungTheoDoi(); goBang(); S.v = ""; return; }
+    if (!v) { dungTheoDoi(); goBang(); goMoiBat(); choBat = ""; S.v = ""; return; }
+    goMoiBat(); if (v !== choBat) choBat = "";
     if (!ep && v === S.v && S.host && S.host.isConnected) return;
     if (ep) S.v = "";
     dungTheoDoi();
@@ -1566,7 +1638,16 @@
       // trượt hết mọi đường, rồi rơi xuống đường đọc DOM và vớ nhầm thứ khác.
       // Đây chính là lý do vào video có quảng cáo thì phải F5 mới ra bảng đúng.
       if (dangQuangCao() && lan < 240) { lan++; return; }
-      if (choDat()) { clearInterval(dangCho); await khoiDong(v); return; }
+      if (choDat()) {
+        clearInterval(dangCho);
+        // Phải ĐỢI đọc xong cài đặt rồi mới quyết: tuBat mặc định false, mà đọc
+        // cài đặt là bất đồng bộ — quyết sớm thì video nào cũng rơi vào nhánh đợi.
+        await daDocCaiDat;
+        if (maVideo() !== v) return;
+        if (tuBat) await khoiDong(v);
+        else moiBat(v);
+        return;
+      }
       if (++lan > 240) clearInterval(dangCho);
     };
     dangCho = setInterval(thu, 500);
@@ -1581,6 +1662,8 @@
     // YouTube dựng lại cột phải khá tuỳ hứng và cuốn theo cả bảng này; dựng lại
     // khi thấy nó biến mất, chứ không bắt người dùng tải lại trang.
     if (S.v && S.v !== tatCho && (!S.host || !S.host.isConnected) && choDat()) khoiDong(S.v);
+    if (!tuBat && choBat && choBat === maVideo() && !S.host
+        && (!S.hostBat || !S.hostBat.isConnected) && choBat !== tatCho && choDat()) moiBat(choBat);
   }, 700);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", xemLai);
   else xemLai();

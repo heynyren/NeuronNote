@@ -693,6 +693,10 @@
       "展開",
     "Neuron Note · Lời thoại":
       "Neuron Note · 文字起こし",
+    "Hiện phụ đề & dịch": "文字起こしを表示して翻訳",
+    "Để tiết kiệm, bảng chỉ lấy phụ đề và gọi dịch khi bạn bấm.":
+      "節約のため、タップしたときだけ字幕を取得して翻訳します。",
+    "Ẩn cho video này": "この動画では隠す",
     "Nạp lại bảng":
       "パネルを再読み込み",
     "Nạp lại bảng (lần {n}/2 — lần nữa sẽ tải lại cả trang)":
@@ -769,6 +773,10 @@
       "Expand",
     "Neuron Note · Lời thoại":
       "Neuron Note · Transcript",
+    "Hiện phụ đề & dịch": "Show transcript & translate",
+    "Để tiết kiệm, bảng chỉ lấy phụ đề và gọi dịch khi bạn bấm.":
+      "To save quota, the panel only fetches the transcript and translates when you tap.",
+    "Ẩn cho video này": "Hide for this video",
     "Nạp lại bảng":
       "Reload the panel",
     "Nạp lại bảng (lần {n}/2 — lần nữa sẽ tải lại cả trang)":
