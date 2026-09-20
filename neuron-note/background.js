@@ -142,6 +142,15 @@ async function captureAndSave(tab, fallbackText, label, sanCap) {
         const std = NN.toStandardMath(src);
         return std && std !== NN.squash(cap.text) ? std : '';
       })(),
+      // Nguồn YouTube: mốc giây để sau này quay về đúng chỗ người ta đang nói
+      // câu đó. Mốc giây là toạ độ tuyệt đối — không trôi như việc dò lại chữ
+      // trên trang. Chỉ là một loại NGUỒN mới, không phải loại mục mới.
+      yt: (cap.yt && cap.yt.v) ? {
+        v: String(cap.yt.v),
+        t: Math.max(0, Math.floor(cap.yt.t || 0)),
+        dur: cap.yt.dur ? Math.max(1, Math.round(cap.yt.dur)) : 0,
+        kenh: cap.yt.kenh || ''
+      } : null,
       // Bản dịch đi kèm khi lưu từ bảng lời thoại: xem video kỹ thuật tiếng
       // nước ngoài thì câu gốc nằm một mình trong sổ chẳng giúp được gì.
       note: cap.note || '',
