@@ -143,6 +143,56 @@
     updateDuePill();
   }
 
+  /* ---------- YouTube sources ----------
+     Returning to a second is sturdier than re-finding a passage: the second is an
+     absolute coordinate, so it survives the page being rebuilt. If the video is
+     already open in some tab, jump to that tab and seek it — opening a second tab
+     for the same video is wasteful and loses the spot the user was watching. */
+
+  /** "1:23" / "1:02:03" from a number of seconds. */
+  function ytStamp(t) {
+    const s = Math.max(0, Math.floor(t || 0));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    const pad = n => (n < 10 ? '0' : '') + n;
+    return (h ? h + ':' + pad(m) : m) + ':' + pad(sec);
+  }
+
+  function ytUrl(yt) {
+    return 'https://www.youtube.com/watch?v=' + encodeURIComponent(yt.v) +
+           '&t=' + Math.max(0, Math.floor(yt.t || 0)) + 's';
+  }
+
+  function openYoutube(yt) {
+    const t = Math.max(0, Math.floor(yt.t || 0));
+    const url = ytUrl(yt);
+    const fresh = () => chrome.tabs.create({ url });
+    try {
+      chrome.tabs.query({ url: ['https://www.youtube.com/watch*', 'https://m.youtube.com/watch*'] }, tabs => {
+        if (chrome.runtime.lastError) { fresh(); return; }
+        const hit = (tabs || []).find(tb => (tb.url || '').indexOf('v=' + yt.v) >= 0);
+        if (!hit) { fresh(); return; }
+        chrome.tabs.update(hit.id, { active: true });
+        if (hit.windowId != null) chrome.windows.update(hit.windowId, { focused: true });
+        chrome.tabs.sendMessage(hit.id, { type: 'YT_SEEK', v: yt.v, t: t }, () => {
+          // A tab opened before the extension was installed or reloaded has no
+          // content script yet; loading the timestamped URL gets there anyway.
+          if (chrome.runtime.lastError) chrome.tabs.update(hit.id, { url: url });
+        });
+      });
+    } catch (e) { fresh(); }
+  }
+
+  /** Open a note's source: a video moment when it has one, else the page passage. */
+  function openSource(note) {
+    if (note.yt && note.yt.v) { openYoutube(note.yt); return; }
+    chrome.tabs.create({ url: note.fragUrl || note.url });
+  }
+
+  /** The link to hand out for a note — a timestamped watch URL for video sources. */
+  function shareUrl(note) {
+    return (note.yt && note.yt.v) ? ytUrl(note.yt) : (note.fragUrl || note.url);
+  }
+
   function labelDot(color) {
     return color
       ? `<span class="ldot" style="background:var(--${esc(color)})"></span>`
@@ -287,8 +337,10 @@
           </div>
         </div>
         <div class="meta">
-          <a class="src" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">${esc(n.title || n.url)}</a>
-          <span class="sep">·</span><span>${esc(NN.hostOf(n.url))}</span>
+          <a class="src" href="${esc(shareUrl(n))}" target="_blank" rel="noopener">${esc(n.title || n.url)}</a>
+          <span class="sep">·</span>${(n.yt && n.yt.v)
+            ? `<span class="yt-at" title="Back to this moment in the video">\u25B6 ${esc(ytStamp(n.yt.t))}</span>`
+            : `<span>${esc(NN.hostOf(n.url))}</span>`}
           <span class="sep">·</span><span>${when(n.createdAt)}</span>
           <span class="srs-tag">${srsBadge(n)}</span>
           ${NN.inStudy(n) ? `<span class="grade-inline">
@@ -348,10 +400,10 @@
 
     switch (btn.dataset.act) {
       case 'open':
-        chrome.tabs.create({ url: note.fragUrl || note.url });
+        openSource(note);
         break;
       case 'copy':
-        navigator.clipboard.writeText(note.fragUrl || note.url)
+        navigator.clipboard.writeText(shareUrl(note))
           .then(() => toast('Copied a link to this passage'), () => toast('Could not copy the link'));
         break;
       case 'edit':
@@ -1158,7 +1210,9 @@
         ${tags ? `<div class="st-tags">${tags}</div>` : ''}
         <div class="st-reveal" hidden>
           ${NN.squash(n.note) ? `<p class="st-note">${mathHtml(n.note)}</p>` : '<p class="st-note muted">— no note yet —</p>'}
-          <a class="st-open" href="${esc(n.fragUrl || n.url)}" target="_blank" rel="noopener">Open source passage ↗</a>
+          <button class="st-open" data-st="open-src">${(n.yt && n.yt.v)
+            ? 'Back to ' + esc(ytStamp(n.yt.t)) + ' in the video \u2197'
+            : 'Open source passage \u2197'}</button>
           ${filesViewHtml(n)}
         </div>
         <div class="st-edit" hidden>
@@ -1290,6 +1344,7 @@
       return;
     }
 
+    if (act === 'open-src') { openSource(state.notes[n.id] || n); return; }
     if (act === 'reveal') {
       card.querySelector('.st-reveal').hidden = false;
       card.querySelector('[data-st="reveal"]').hidden = true;

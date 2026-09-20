@@ -200,7 +200,7 @@
     const id = btn.closest('.note').dataset.id;
     const note = state.notes[id]; if (!note) return;
     const act = btn.dataset.act;
-    if (act === 'open') { openUrl(note.fragUrl || note.url); return; }
+    if (act === 'open') { openUrl(srcUrl(note)); return; }
     if (act === 'edit') { openEditor(note); return; }
     if (act === 'grade-yes' || act === 'grade-no') {
       const next = Object.assign({}, note); NN.ensureSrs(next); next.srs = Object.assign({}, next.srs);
@@ -233,6 +233,16 @@
     const base = hash === -1 ? u.slice(0, idx) : u.slice(0, hash);
     return base + '#:~:' + u.slice(idx + 3);
   }
+  /** Link của một mục: nguồn YouTube thì kèm mốc giây để mở đúng chỗ.
+      Không tua được tab đang mở như trên máy tính, nhưng app YouTube hiểu &t=. */
+  function srcUrl(n) {
+    if (n && n.yt && n.yt.v) {
+      return 'https://www.youtube.com/watch?v=' + encodeURIComponent(n.yt.v) +
+             '&t=' + Math.max(0, Math.floor(n.yt.t || 0)) + 's';
+    }
+    return (n && (n.fragUrl || n.url)) || '';
+  }
+
   function openUrl(u) {
     u = mobileFragUrl(u);
     if (!u) return;
@@ -457,7 +467,7 @@
     if (state.study.i >= state.study.queue.length) showDone(false); else renderStudyCard();
   }
   $('#studyStage').addEventListener('click', e => {
-    if (e.target.closest('[data-open]')) { const n = state.study.queue[state.study.i]; openUrl(n.fragUrl || n.url); return; }
+    if (e.target.closest('[data-open]')) { const n = state.study.queue[state.study.i]; openUrl(srcUrl(n)); return; }
     const b = e.target.closest('[data-st]'); if (!b) return;
     const n = state.study.queue[state.study.i]; if (!n) return;
     const act = b.dataset.st;

@@ -755,6 +755,84 @@
     return out;
   }
 
+  /* ================= YouTube source =================
+     A passage saved while watching a video carries `yt = {v, t}` beside its url.
+     A second is an absolute coordinate: unlike a text anchor it cannot drift when
+     the page rerenders, so returning to the moment is far more reliable than
+     re-finding the words. This is a new kind of SOURCE, not a new kind of note —
+     labels, study scheduling, sync and the rest keep working untouched. */
+
+  /** The video id of the page we are on, or '' when this is not a watch page. */
+  function ytVideoId() {
+    if (!/(?:^|\.)youtube\.com$/.test(location.hostname)) return '';
+    const q = location.search.match(/[?&]v=([\w-]{6,})/);
+    if (q) return q[1];
+    const p = location.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]{6,})/);
+    return p ? p[1] : '';
+  }
+
+  function ytVideoEl() {
+    return document.querySelector('video.html5-main-video') || document.querySelector('video');
+  }
+
+  /** Seconds from "1:23" or "1:23:45". NaN-safe: returns -1 when unreadable. */
+  function ytSeconds(str) {
+    const m = String(str || '').trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+    if (!m) return -1;
+    return (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+m[3]);
+  }
+
+  /**
+   * The second a selection points at.
+   *
+   * A selection inside YouTube's transcript panel names its own line, and that is
+   * better than "wherever playback happens to be": people pause, scroll ahead and
+   * read several lines before deciding to save one. Only when the selection is not
+   * a transcript line (description, comments, a title) does the playhead apply.
+   */
+  function ytTimeFor(range) {
+    const seg = ytSegmentOf(range);
+    if (seg >= 0) return seg;
+    const vd = ytVideoEl();
+    return vd && isFinite(vd.currentTime) ? Math.floor(vd.currentTime) : 0;
+  }
+
+  /**
+   * Timestamp of the transcript line holding the selection, or -1.
+   *
+   * YouTube renames these classes periodically, so read the dedicated timestamp
+   * element when it is there and otherwise fall back to a leading "m:ss" in the
+   * row's own text. Climbing a few levels covers the selection starting in a
+   * nested span.
+   */
+  // Containers that can never be a single transcript row.
+  const ROOTISH = { BODY: 1, HTML: 1, MAIN: 1, ARTICLE: 1 };
+
+  function ytSegmentOf(range) {
+    let el = range && range.startContainer;
+    if (el && el.nodeType === 3) el = el.parentElement;
+    for (let i = 0; el && i < 6; i++, el = el.parentElement) {
+      if (!el.querySelector || ROOTISH[el.tagName]) break;
+      // The ancestor must be ONE row, not a container holding the whole panel:
+      // climbing blindly reaches <body>, whose querySelector happily returns the
+      // first line of the transcript and stamps an unrelated selection with it.
+      if (el.querySelectorAll('.segment-timestamp').length > 1) break;
+      if (el.querySelectorAll('.segment-text').length > 1) break;
+      const ts = el.querySelector('.segment-timestamp');
+      if (ts) {
+        const t = ytSeconds(ts.textContent);
+        if (t >= 0) return t;
+      }
+      // a row that starts with its own timestamp, whatever the markup is called
+      const lead = squash(el.textContent).match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s/);
+      if (lead && el.children.length <= 6) {
+        const t = ytSeconds(lead[1]);
+        if (t >= 0) return t;
+      }
+    }
+    return -1;
+  }
+
   function capture() {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
@@ -768,9 +846,11 @@
     // so ordinary passages don't carry a redundant duplicate around.
     const rich = richTextOfRange(range);
     const ctx = contextAround(range);
+    const v = ytVideoId();
     return {
       text,
       rich: rich && rich !== text ? rich : '',
+      yt: v ? { v: v, t: ytTimeFor(range) } : null,
       prefix: ctx.prefix,
       suffix: ctx.suffix,
       title: document.title,
@@ -835,7 +915,7 @@
 
   // Test hook, mirroring window.__NN_APP__ in the Android app: lets the jsdom
   // suite drive the LaTeX capture without a browser.
-  window.__NN_TEST__ = { richTextOfRange, texOf, isDisplayMath };
+  window.__NN_TEST__ = { richTextOfRange, texOf, isDisplayMath, ytVideoId, ytTimeFor, ytSegmentOf };
 
   /* ================= startup ================= */
   if (document.readyState === 'loading') {

@@ -662,3 +662,18 @@ kbd {
   .pg-confetti { display: none; }
   .pg-cel-sym, .pg-cel-card, .pg-cel-badge { animation: none; }
 }
+
+/* ---------- nguồn YouTube ---------- */
+/* Mốc giây thay cho tên miền: "youtube.com" thì ai cũng biết rồi, cái cần
+   thấy ngay là câu này nằm ở phút thứ mấy. */
+.yt-at {
+  display: inline-flex; align-items: center; gap: 3px;
+  font: 600 10px/1 var(--mono); color: var(--signal);
+  background: var(--signal-soft); border-radius: 999px; padding: 3px 7px;
+}
+/* .st-open từng là thẻ <a>; nay là <button> nên phải gỡ nền và viền mặc định. */
+button.st-open {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: 12px var(--mono); color: var(--signal); text-align: left;
+}
+button.st-open:hover { text-decoration: underline; }
