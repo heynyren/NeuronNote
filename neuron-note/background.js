@@ -142,6 +142,10 @@ async function captureAndSave(tab, fallbackText, label, sanCap) {
         const std = NN.toStandardMath(src);
         return std && std !== NN.squash(cap.text) ? std : '';
       })(),
+      // Đoạn văn bao quanh phần bôi đen. Không phải để neo lại vị trí (prefix/
+      // suffix lo việc đó) mà để sau này còn hỏi được: một chữ đứng trơ ra thì
+      // hiểu kiểu gì cũng được, cả đoạn quanh nó thì không.
+      ctx: NN.squash(cap.ctx || ''),
       // Nguồn YouTube: mốc giây để sau này quay về đúng chỗ người ta đang nói
       // câu đó. Mốc giây là toạ độ tuyệt đối — không trôi như việc dò lại chữ
       // trên trang. Chỉ là một loại NGUỒN mới, không phải loại mục mới.
@@ -182,9 +186,13 @@ async function captureAndSave(tab, fallbackText, label, sanCap) {
     }
 
     if (settings.autoSync && settings.syncUrl) syncNow().catch(() => {});
+    // Người gọi cần id: hỏi Gemini xong thì link đoạn chat phải gắn vào ĐÚNG mục
+    // vừa lưu, không có id thì không gắn vào đâu được.
+    return note;
   } catch (err) {
     console.error('[NeuronNote] ERROR while saving:', err);
     flashBadge(tab && tab.id, '!', '#A3352A');
+    return null;
   }
 }
 
@@ -298,9 +306,70 @@ async function handleTranslateMany(rawTexts, from, to) {
 }
 
 /* ---------------- messages from content / pages ---------------- */
+/* ================= hỏi Gemini =================
+   Mở trang chat rồi CANH chính tab ấy: hỏi xong, Gemini đổi địa chỉ thành
+   /app/<mã đoạn chat>, và đó là thứ đáng giữ cho mục này — lần sau mở ra là đọc
+   lại được cả câu trả lời, không phải hỏi lại từ đầu. Trang thư viện mở tab thì
+   đóng trang đó là hết ai canh, nên việc này phải nằm ở nền. */
+const GEMINI_RE = /^https:\/\/gemini\.google\.com\/app\/[A-Za-z0-9_-]{4,}/;
+const GEMINI_CHO = 'geminiCho';      // {tabId: {id, ts}} — các tab đang chờ có link
+
+async function geminiChoDoc() {
+  return (await chrome.storage.local.get(GEMINI_CHO))[GEMINI_CHO] || {};
+}
+function geminiChoGhi(cho) { return chrome.storage.local.set({ [GEMINI_CHO]: cho }); }
+
+async function moGeminiVaCanh(noteId) {
+  const tab = await chrome.tabs.create({ url: 'https://gemini.google.com/app' });
+  if (!noteId || !tab || tab.id == null) return tab && tab.id;
+  const cho = await geminiChoDoc();
+  cho[String(tab.id)] = { id: noteId, ts: Date.now() };
+  await geminiChoGhi(cho);
+  return tab.id;
+}
+
+async function geminiGhiLink(tabId, url) {
+  const cho = await geminiChoDoc();
+  const cho1 = cho[String(tabId)];
+  if (!cho1 || !cho1.id) return;
+  delete cho[String(tabId)];
+  await geminiChoGhi(cho);
+  const notes = await NN.getNotes();
+  const cur = notes[cho1.id];
+  if (!cur || cur.deleted) return;          // mục bị xoá trong lúc chờ
+  // Chỉ giữ link MỚI NHẤT: hỏi lại là câu hỏi đã khác, đoạn chat cũ không còn
+  // là chỗ để quay về.
+  await NN.putNote(Object.assign({}, cur, {
+    hoiAi: { url: url, ts: Date.now() },
+    updatedAt: Date.now()
+  }));
+}
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  // info.url chỉ có khi địa chỉ vừa đổi. Gemini đổi bằng pushState, mà tuỳ phiên
+  // bản Chrome thì info.url có thể vắng — nên lấy thêm tab.url cho chắc.
+  const u = info.url || (tab && tab.url) || '';
+  if (!GEMINI_RE.test(u)) return;
+  geminiGhiLink(tabId, u).catch(() => {});
+});
+
+// Đóng tab mà chưa hỏi gì thì bỏ mục chờ, đừng để nó nằm lại chiếm chỗ.
+chrome.tabs.onRemoved.addListener(tabId => {
+  geminiChoDoc().then(cho => {
+    if (!cho[String(tabId)]) return;
+    delete cho[String(tabId)];
+    return geminiChoGhi(cho);
+  }).catch(() => {});
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     switch (msg && msg.type) {
+      case 'MO_GEMINI': {
+        const id = await moGeminiVaCanh(msg.id).catch(() => null);
+        sendResponse({ ok: id != null, tabId: id });
+        break;
+      }
       case 'GET_PAGE_NOTES': {
         const { notes, settings } = await NN.getAll();
         const key = NN.normalizeUrl(msg.url);
@@ -349,10 +418,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       // Bảng lời thoại YouTube gửi thẳng đoạn cần lưu kèm mốc giây trong URL.
       case 'SAVE_CAP': {
+        let saved = null;
         if (sender.tab && msg.cap && msg.cap.text) {
-          captureAndSave(sender.tab, '', msg.label || '', msg.cap);
+          saved = await captureAndSave(sender.tab, '', msg.label || '', msg.cap);
         }
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, id: saved ? saved.id : '' });
         break;
       }
       case 'OPEN_LIBRARY':

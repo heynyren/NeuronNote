@@ -193,6 +193,39 @@
     return (note.yt && note.yt.v) ? ytUrl(note.yt) : (note.fragUrl || note.url);
   }
 
+  /* ---------- hỏi Gemini ----------
+     Câu hỏi đi qua BỘ NHỚ TẠM chứ không qua `?q=` trên URL: Gemini không còn đọc
+     tham số đó, và hỏng im lặng — trang mở ra bình thường với ô chat trống, nhìn
+     y như nút bị liệt. Thêm đúng một thao tác Ctrl+V, đổi lại thì chắc chắn chạy
+     và câu hỏi không bị trần độ dài của URL cắt cụt. */
+  function phimDan() {
+    return /Mac|iPhone|iPad/.test(navigator.platform || '') ? '\u2318V' : 'Ctrl+V';
+  }
+
+  async function hoiGemini(note) {
+    if (!note) return;
+    const loi = HoiGemini.loiHoi(note, { nhan: note.tags || [] });
+    try {
+      await navigator.clipboard.writeText(loi);
+    } catch (e) {
+      toast('Không chép được câu hỏi vào bộ nhớ tạm — bấm lại một lần nữa');
+      return;
+    }
+    // Nhờ NỀN mở tab: nền còn phải canh chính tab ấy để bắt link đoạn chat. Mở
+    // từ đây thì đóng trang thư viện là hết ai canh.
+    chrome.runtime.sendMessage({ type: 'MO_GEMINI', id: note.id }, () => {
+      if (chrome.runtime.lastError) {
+        try { window.open(HoiGemini.GEMINI_URL, '_blank', 'noopener'); } catch (e2) {}
+      }
+    });
+    toast('Đã chép câu hỏi — sang Gemini bấm ' + phimDan() + ' rồi Enter');
+  }
+
+  /** Link đoạn chat đã hỏi lần trước, nếu có. */
+  function chatLink(n) {
+    return (n.hoiAi && n.hoiAi.url) ? n.hoiAi.url : '';
+  }
+
   function labelDot(color) {
     return color
       ? `<span class="ldot" style="background:var(--${esc(color)})"></span>`
@@ -351,6 +384,8 @@
             <button class="btn link" data-act="open">Open passage</button>
             <button class="btn link" data-act="copy">Copy link</button>
             <button class="btn link" data-act="study-toggle">${studyToggleLabel(n)}</button>
+            <button class="btn link gem" data-act="gemini" title="Chép câu hỏi kèm ngữ cảnh rồi mở Gemini">Hỏi Gemini</button>
+            ${chatLink(n) ? `<a class="btn link gem-back" href="${esc(chatLink(n))}" target="_blank" rel="noopener" title="Mở lại đoạn chat đã hỏi">↩ chat</a>` : ''}
             <button class="btn link" data-act="edit">Edit</button>
             <button class="btn link danger" data-act="del">Delete</button>
           </span>
@@ -401,6 +436,9 @@
     switch (btn.dataset.act) {
       case 'open':
         openSource(note);
+        break;
+      case 'gemini':
+        hoiGemini(note);
         break;
       case 'copy':
         navigator.clipboard.writeText(shareUrl(note))
@@ -1248,6 +1286,8 @@
           </div>
         </div>
         <div class="st-side">
+          <button class="btn link gem" data-st="gemini">Hỏi Gemini</button>
+          ${chatLink(n) ? `<a class="btn link gem-back" href="${esc(chatLink(n))}" target="_blank" rel="noopener">↩ chat</a>` : ''}
           <button class="btn link" data-st="edit">Edit note &amp; labels</button>
           <button class="btn link" data-st="hide">Snooze</button>
           <button class="btn link" data-st="known">Mastered</button>
@@ -1345,6 +1385,7 @@
     }
 
     if (act === 'open-src') { openSource(state.notes[n.id] || n); return; }
+    if (act === 'gemini') { hoiGemini(state.notes[n.id] || n); return; }
     if (act === 'reveal') {
       card.querySelector('.st-reveal').hidden = false;
       card.querySelector('[data-st="reveal"]').hidden = true;

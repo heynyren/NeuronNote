@@ -755,6 +755,70 @@
     return out;
   }
 
+  /**
+   * The passage's surrounding text, for handing to a model later.
+   *
+   * `prefix`/`suffix` above are NOT this. Those are 60-character stubs tuned for
+   * the text-fragment anchor, and widening them would change every link the app
+   * has already built. What a model needs is different and much larger: enough
+   * prose around the highlight to tell which sense is meant — a lone "tension"
+   * could be mechanical, electrical, dramatic or political, and the paragraph it
+   * sits in settles that instantly.
+   *
+   * Notes here cover any subject, not one language's vocabulary, so the window is
+   * a whole paragraph (and its neighbours when the paragraph is thin) rather than
+   * the single sentence a vocabulary app would take.
+   */
+  const CTX_BEFORE = 700;     // characters kept ahead of the highlight
+  const CTX_AFTER = 700;      // …and behind it
+  const CTX_MIN = 200;        // below this a paragraph is too thin to stand alone
+
+  function blockAround(range) {
+    let c = range.commonAncestorContainer;
+    if (c.nodeType === 3) c = c.parentNode;
+    return (c.closest && c.closest('p,li,td,th,blockquote,h1,h2,h3,h4,h5,article,section,main,div')) || document.body;
+  }
+
+  /** Text of a block plus enough of its siblings to reach CTX_MIN. */
+  function widenBlock(block) {
+    let el = block, out = squash(el.textContent || '');
+    for (let i = 0; i < 3 && out.length < CTX_MIN; i++) {
+      const up = el.parentElement;
+      if (!up || up === document.body || up === document.documentElement) break;
+      const wider = squash(up.textContent || '');
+      if (wider.length <= out.length) break;
+      el = up; out = wider;
+    }
+    return out;
+  }
+
+  /**
+   * Returns the surrounding prose with the highlight left in place, trimmed to a
+   * window centred on it. Cutting at a space keeps a half-word from appearing to
+   * be part of the quote.
+   */
+  function contextText(range, text) {
+    try {
+      const block = blockAround(range);
+      const whole = widenBlock(block);
+      if (!whole) return '';
+
+      const at = text ? whole.indexOf(text) : -1;
+      if (at < 0) return whole.slice(0, CTX_BEFORE + CTX_AFTER);
+
+      let from = Math.max(0, at - CTX_BEFORE);
+      let to = Math.min(whole.length, at + text.length + CTX_AFTER);
+      if (from > 0) { const sp = whole.indexOf(' ', from); if (sp > 0 && sp < at) from = sp + 1; }
+      if (to < whole.length) { const sp = whole.lastIndexOf(' ', to); if (sp > at + text.length) to = sp; }
+
+      const cut = whole.slice(from, to).trim();
+      // A context identical to the passage adds nothing — the caller drops it.
+      return cut === text ? '' : (from > 0 ? '… ' : '') + cut + (to < whole.length ? ' …' : '');
+    } catch (e) {
+      return '';
+    }
+  }
+
   /* ================= YouTube source =================
      A passage saved while watching a video carries `yt = {v, t}` beside its url.
      A second is an absolute coordinate: unlike a text anchor it cannot drift when
@@ -850,6 +914,7 @@
     return {
       text,
       rich: rich && rich !== text ? rich : '',
+      ctx: contextText(range, text),
       yt: v ? { v: v, t: ytTimeFor(range) } : null,
       prefix: ctx.prefix,
       suffix: ctx.suffix,
@@ -915,7 +980,7 @@
 
   // Test hook, mirroring window.__NN_APP__ in the Android app: lets the jsdom
   // suite drive the LaTeX capture without a browser.
-  window.__NN_TEST__ = { richTextOfRange, texOf, isDisplayMath, ytVideoId, ytTimeFor, ytSegmentOf };
+  window.__NN_TEST__ = { richTextOfRange, texOf, isDisplayMath, ytVideoId, ytTimeFor, ytSegmentOf, contextText };
 
   /* ================= startup ================= */
   if (document.readyState === 'loading') {

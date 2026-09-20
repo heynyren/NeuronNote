@@ -677,3 +677,14 @@ button.st-open {
   font: 12px var(--mono); color: var(--signal); text-align: left;
 }
 button.st-open:hover { text-decoration: underline; }
+
+/* ---------- hỏi Gemini ---------- */
+.btn.link.gem { color: var(--signal); font-weight: 600; }
+.btn.link.gem:hover { text-decoration: underline; }
+/* Link quay lại đoạn chat đã hỏi — nhạt hơn nút hỏi, vì nó là đường phụ. */
+.btn.link.gem-back {
+  color: var(--muted); text-decoration: none; font: 11px var(--mono);
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px;
+}
+.btn.link.gem-back:hover { border-color: var(--signal); color: var(--signal); }
+.st-side .gem { font: 12px var(--mono); }
