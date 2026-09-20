@@ -1,7 +1,7 @@
 /* Chạy toàn bộ test của extension: node test/run.js  (cần: npm i jsdom fake-indexeddb) */
 const { execFileSync } = require('child_process');
 const path = require('path');
-const files = ['math.js', 'raw-latex.js', 'capture.js', 'render.js', 'attach.js', 'store-race.js', 'youtube.js', 'context.js', 'gemini.js', 'gemini-ui.js'];
+const files = ['math.js', 'raw-latex.js', 'capture.js', 'render.js', 'attach.js', 'store-race.js', 'youtube.js', 'context.js', 'gemini.js', 'gemini-ui.js', 'gemini-yt.js'];
 let bad = 0;
 files.forEach(f => {
   process.stdout.write('\n=== ' + f + ' ===\n');

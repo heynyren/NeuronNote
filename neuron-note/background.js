@@ -186,9 +186,13 @@ async function captureAndSave(tab, fallbackText, label, sanCap) {
     }
 
     if (settings.autoSync && settings.syncUrl) syncNow().catch(() => {});
+    // Người gọi cần id: hỏi Gemini xong thì link đoạn chat phải gắn vào ĐÚNG mục
+    // vừa lưu, không có id thì không gắn vào đâu được.
+    return note;
   } catch (err) {
     console.error('[NeuronNote] ERROR while saving:', err);
     flashBadge(tab && tab.id, '!', '#A3352A');
+    return null;
   }
 }
 
@@ -414,10 +418,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       // Bảng lời thoại YouTube gửi thẳng đoạn cần lưu kèm mốc giây trong URL.
       case 'SAVE_CAP': {
+        let saved = null;
         if (sender.tab && msg.cap && msg.cap.text) {
-          captureAndSave(sender.tab, '', msg.label || '', msg.cap);
+          saved = await captureAndSave(sender.tab, '', msg.label || '', msg.cap);
         }
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, id: saved ? saved.id : '' });
         break;
       }
       case 'OPEN_LIBRARY':

@@ -858,7 +858,7 @@
     /* Chỉ CHỮ của lời thoại mới bôi đen được. Nút Lưu, thanh công cụ, ô dịch
        nhanh… đều là đồ điều khiển — bôi đen vắt qua mấy dòng mà lôi luôn chữ
        "Lưu" vào giữa câu thì bản dịch hỏng, mà lưu vào sổ tay cũng hỏng theo. */
-    .top, .bar, .back, .tip, .ln .sv {
+    .top, .bar, .back, .tip, .ln .sv, .ln .gm {
       -webkit-user-select: none; user-select: none;
     }
     .ln .sv {
@@ -867,6 +867,16 @@
       display: inline-flex; align-items: center; gap: 3px;
     }
     .ln:hover .sv, .ln.on .sv { visibility: visible; }
+    /* Nút hỏi Gemini: cùng kiểu nút Lưu, nhưng nhạt hơn — nó là việc phụ, làm
+       sau khi đã lưu, nên không được tranh chỗ nhìn với nút Lưu. */
+    .ln .gm {
+      flex: none; visibility: hidden; border: 1px solid var(--line); background: var(--surface);
+      color: var(--ink-2); border-radius: 999px; padding: 3px 7px; font-size: 11px; font-weight: 650;
+      cursor: pointer;
+    }
+    .ln:hover .gm, .ln.on .gm { visibility: visible; }
+    .ln .gm:hover { color: var(--accent); border-color: var(--accent); }
+    .ln .gm.done { color: var(--good); background: var(--good-soft); border-color: transparent; }
     .ln .sv.done { color: var(--good); background: var(--good-soft); border-color: transparent; }
     .st { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 13px; padding: 14px 13px; }
     .back {
@@ -1192,6 +1202,13 @@
       sv.addEventListener("click", (e) => { e.stopPropagation(); luuCau(i, sv, svt); });
       ln.appendChild(sv);
 
+      const gm = document.createElement("button");
+      gm.className = "gm"; gm.type = "button";
+      gm.title = T("Lưu câu này rồi hỏi Gemini, kèm các dòng xung quanh");
+      gm.textContent = "Gemini";
+      gm.addEventListener("click", (e) => { e.stopPropagation(); hoiGeminiCau(i, gm); });
+      ln.appendChild(gm);
+
       list.appendChild(ln);
     });
     S.uiDem.textContent = S.cau.length ? S.cau.length + " câu" : "";
@@ -1447,6 +1464,31 @@
    * nội dung. Hai là `note` mang bản dịch: xem video kỹ thuật tiếng nước ngoài
    * thì một câu gốc nằm trơ trong sổ chẳng giúp được gì.
    */
+  /**
+   * Các dòng thoại quanh dòng thứ i, gộp thành một đoạn.
+   *
+   * Một dòng phụ đề đứng một mình thường cụt nghĩa — người ta nói vắt qua mấy
+   * dòng, và đại từ thì trỏ ngược lên dòng trước. Lấy rộng ra hai phía để sau
+   * này còn hỏi được; cắt theo SỐ KÝ TỰ chứ không theo số dòng, vì dòng tự sinh
+   * dài ngắn rất chênh nhau.
+   */
+  const NGU_CANH_MOI_BEN = 700;
+  function nguCanhQuanh(i) {
+    const truoc = [], sau = [];
+    let d1 = 0, d2 = 0;
+    for (let k = i - 1; k >= 0 && d1 < NGU_CANH_MOI_BEN; k--) {
+      const t = (S.cau[k] && S.cau[k].s) || ""; if (!t) continue;
+      truoc.unshift(t); d1 += t.length + 1;
+    }
+    for (let k = i + 1; k < S.cau.length && d2 < NGU_CANH_MOI_BEN; k++) {
+      const t = (S.cau[k] && S.cau[k].s) || ""; if (!t) continue;
+      sau.push(t); d2 += t.length + 1;
+    }
+    const giua = (S.cau[i] && S.cau[i].s) || "";
+    const ra = truoc.concat([giua], sau).join(" ").replace(/\s+/g, " ").trim();
+    return ra === giua ? "" : (truoc.length ? "… " : "") + ra + (sau.length ? " …" : "");
+  }
+
   function capCua(i, chu, giay, dich) {
     const n = nguon(i);
     const t = Math.max(0, Math.floor(giay != null ? giay : ((n && n.yt && n.yt.t) || 0)));
@@ -1454,9 +1496,46 @@
       text: chu,
       note: dich || "",
       prefix: "", suffix: "",
+      // Mốc giây phải đi CÙNG mục, không chỉ nằm trong URL: thư viện dựa vào nó
+      // để tua đúng tab đang mở thay vì nạp lại trang từ đầu.
+      yt: n && n.yt ? { v: n.yt.v, t: t, dur: n.yt.dur, kenh: n.yt.kenh } : null,
+      ctx: nguCanhQuanh(i),
       title: (S.tieuDe || "") + (S.kenh ? " — " + S.kenh : ""),
       url: "https://www.youtube.com/watch?v=" + encodeURIComponent(S.v) + "&t=" + t + "s"
     };
+  }
+
+  /* --- hỏi Gemini về một dòng thoại ---
+     Lưu TRƯỚC rồi mới hỏi: hỏi xong nền sẽ gắn link đoạn chat vào mục, mà chưa
+     có mục thì không có chỗ nào để gắn. Dòng đã lưu rồi thì dùng lại id cũ. */
+  const daLuuId = new Map();      // i -> id mục trong sổ
+
+  function hoiGeminiCau(i, nut) {
+    const c = S.cau[i];
+    if (!c) return;
+    const xong = (id) => {
+      const cap = capCua(i, c.s, null, S.dich.get(i) || "");
+      const loi = window.HoiGemini.loiHoi({
+        id: id, text: cap.text, ctx: cap.ctx, note: cap.note,
+        title: cap.title, url: cap.url, yt: cap.yt
+      });
+      navigator.clipboard.writeText(loi).then(() => {
+        chrome.runtime.sendMessage({ type: "MO_GEMINI", id: id }, () => {
+          if (chrome.runtime.lastError) {
+            try { window.open(window.HoiGemini.GEMINI_URL, "_blank", "noopener"); } catch (e) {}
+          }
+        });
+        nut.classList.add("done");
+      }).catch(() => { nut.disabled = false; });
+    };
+    if (daLuuId.has(i)) { xong(daLuuId.get(i)); return; }
+    nut.disabled = true;
+    chrome.runtime.sendMessage({ type: "SAVE_CAP", cap: capCua(i, c.s, null, S.dich.get(i) || "") }, (res) => {
+      nut.disabled = false;
+      const id = (!chrome.runtime.lastError && res && res.id) || "";
+      if (id) daLuuId.set(i, id);
+      xong(id);
+    });
   }
 
   function luuCau(i, nut, nhan) {
@@ -1464,7 +1543,8 @@
     if (!c) return;
     nut.disabled = true; nhan.textContent = "…";
     const gui = (nghia) => {
-      chrome.runtime.sendMessage({ type: "SAVE_CAP", cap: capCua(i, c.s, null, nghia) }, () => {
+      chrome.runtime.sendMessage({ type: "SAVE_CAP", cap: capCua(i, c.s, null, nghia) }, (res) => {
+        if (!chrome.runtime.lastError && res && res.id) daLuuId.set(i, res.id);
         nut.classList.add("done"); nut.disabled = false;
         nut.textContent = ""; nut.appendChild(ic("check", 12));
         const t = document.createElement("span"); t.textContent = T("Đã lưu"); nut.appendChild(t);
@@ -1575,6 +1655,7 @@
   async function khoiDong(v) {
     await daDocCaiDat;      // đừng dựng bảng bằng thứ tiếng chưa biết là gì
     S.v = v; S.cau = []; S.hien = -1; S.dich.clear(); S.bam = true;
+    daLuuId.clear();
     if (!dungBang()) return false;
     trangThai(T("Đang tìm phụ đề…"));
     try {
